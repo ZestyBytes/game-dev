@@ -613,13 +613,35 @@
     font-size: 0.72rem;
     color: var(--muted);
   }
-  /* Where another family member currently is, layered on this player's map. */
+  /* Scattered decorative emoji per theme (see MAP_THEMES) - a cheap but
+     real "themed background" rather than just a flat tint. */
+  .map-theme-deco {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-size: 1.7rem;
+    opacity: 0.2;
+    pointer-events: none;
+  }
+  /* Where another family member currently is, layered on this player's map -
+     the gem plus their name, not just an unlabeled icon. */
   .player-marker {
     position: absolute;
     z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px 2px 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--panel) 88%, black 8%);
+    border: 1px solid var(--panel-line);
     pointer-events: none;
+    white-space: nowrap;
+    font-family: "Baloo 2", sans-serif;
+    font-weight: 700;
+    font-size: 0.62rem;
+    color: var(--muted);
   }
-  .player-marker .avatar-stack.small .avatar-svg { width: 18px; height: 18px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); }
+  .player-marker .avatar-stack.small .avatar-svg { width: 16px; height: 16px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); }
   .level-node {
     position: absolute;
     z-index: 2;
@@ -2012,11 +2034,11 @@
   // gets past the last one - purely cosmetic (a tinted band + label behind
   // the nodes), no effect on difficulty or candy types.
   const MAP_THEMES = [
-    { name: "Jungle", emoji: "\u{1F334}", tint: "76, 148, 66" },
-    { name: "Space", emoji: "\u{1F680}", tint: "90, 90, 190" },
-    { name: "Farm", emoji: "\u{1F69C}", tint: "212, 158, 58" },
-    { name: "Ocean", emoji: "\u{1F30A}", tint: "42, 138, 168" },
-    { name: "Candy Peaks", emoji: "\u{1F36D}", tint: "214, 96, 158" },
+    { name: "Jungle", emoji: "\u{1F334}", tint: "76, 148, 66", deco: ["\u{1F334}", "\u{1F343}", "\u{1F99C}"] },
+    { name: "Space", emoji: "\u{1F680}", tint: "90, 90, 190", deco: ["\u{2B50}", "\u{1F311}", "\u{1FA90}"] },
+    { name: "Farm", emoji: "\u{1F69C}", tint: "212, 158, 58", deco: ["\u{1F33E}", "\u{1F404}", "\u{1F413}"] },
+    { name: "Ocean", emoji: "\u{1F30A}", tint: "42, 138, 168", deco: ["\u{1F420}", "\u{1F41A}", "\u{1F30A}"] },
+    { name: "Candy Peaks", emoji: "\u{1F36D}", tint: "214, 96, 158", deco: ["\u{1F36D}", "\u{1F36C}", "\u{1F369}"] },
   ];
   function themeForLevel(n) {
     return MAP_THEMES[Math.floor((n - 1) / 10) % MAP_THEMES.length];
@@ -2059,7 +2081,18 @@
     function renderThemeBand(b) {
       const top = b.minY - LEVEL_NODE_SPACING_Y / 2;
       const height = b.maxY - b.minY + LEVEL_NODE_SPACING_Y;
+      // A handful of large, faint theme emoji scattered down the band - a
+      // real (if cheap) themed background rather than just a flat tint.
+      const decoCount = Math.max(2, Math.round(height / 100));
+      let decoHTML = "";
+      for (let i = 0; i < decoCount; i++) {
+        const emoji = b.theme.deco[i % b.theme.deco.length];
+        const yPct = ((i + 0.5) / decoCount) * 100;
+        const xPct = i % 2 === 0 ? 14 : 84;
+        decoHTML += `<span class="map-theme-deco" style="top:${yPct}%;left:${xPct}%;">${emoji}</span>`;
+      }
       return `<div class="map-theme-band" style="top:${top}px;height:${height}px;background:rgba(${b.theme.tint},0.12);">
+        ${decoHTML}
         <span class="map-theme-label">${b.theme.emoji} ${b.theme.name}</span>
       </div>`;
     }
@@ -2113,9 +2146,11 @@
         marker.className = "player-marker";
         marker.style.left = x + "%";
         marker.style.top = y + "px";
-        marker.style.transform = `translate(-50%, -50%) translate(${18 + oi * 14}px, -18px)`;
+        // Stacked vertically (not side by side) so the pill's width, which
+        // varies with name length, never overlaps a sibling marker.
+        marker.style.transform = `translate(-50%, -50%) translate(32px, ${-6 - oi * 24}px)`;
         marker.title = `${other.name} - Level ${other.highestLevelUnlocked || 1}`;
-        marker.innerHTML = avatarHTML(other.avatar, { stars: totalStars(other) });
+        marker.innerHTML = `${avatarHTML(other.avatar, { stars: totalStars(other) })}<span>${escapeHTML(other.name)}</span>`;
         map.appendChild(marker);
       });
 
