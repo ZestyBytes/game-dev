@@ -91,6 +91,21 @@
     touch-action: pan-y; /* re-allow scrolling here despite html/body's blanket touch-action:none */
   }
 
+  /* On a phone, the "card floating on a background" look just reads as
+     wasted space on all four sides - go truly edge-to-edge instead, like a
+     real app rather than a desktop widget. */
+  @media (max-width: 480px) {
+    body { padding: 0; }
+    .cabinet {
+      width: 100%;
+      height: 100dvh;
+      max-height: 100dvh;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+  }
+
   .header {
     display: flex;
     align-items: baseline;
@@ -583,9 +598,38 @@
     overflow-y: auto;
     overflow-x: hidden;
   }
-  .level-path { position: absolute; top: 0; left: 0; pointer-events: none; }
+  .level-path { position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none; }
+  /* One tinted band per themed section (see MAP_THEMES) - purely cosmetic
+     scenery behind the path, grouping levels into "worlds" like a real map. */
+  .map-theme-band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .map-theme-label {
+    display: inline-block;
+    margin: 8px 0 0 10px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--panel) 82%, black 6%);
+    border: 1px solid var(--panel-line);
+    font-family: "Baloo 2", sans-serif;
+    font-weight: 700;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  /* Where another family member currently is, layered on this player's map. */
+  .player-marker {
+    position: absolute;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .player-marker .avatar-stack.small .avatar-svg { width: 18px; height: 18px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); }
   .level-node {
     position: absolute;
+    z-index: 2;
     transform: translate(-50%, -50%);
     width: 58px;
     height: 58px;
@@ -1971,6 +2015,20 @@
   function levelNodeX(i) { return 50 + 30 * Math.sin(i * 0.85); }
   function levelNodeY(i) { return LEVEL_NODE_TOP_PAD + i * LEVEL_NODE_SPACING_Y; }
 
+  // The map is divided into themed 10-level sections, cycling if a player
+  // gets past the last one - purely cosmetic (a tinted band + label behind
+  // the nodes), no effect on difficulty or candy types.
+  const MAP_THEMES = [
+    { name: "Jungle", emoji: "\u{1F334}", tint: "76, 148, 66" },
+    { name: "Space", emoji: "\u{1F680}", tint: "90, 90, 190" },
+    { name: "Farm", emoji: "\u{1F69C}", tint: "212, 158, 58" },
+    { name: "Ocean", emoji: "\u{1F30A}", tint: "42, 138, 168" },
+    { name: "Candy Peaks", emoji: "\u{1F36D}", tint: "214, 96, 158" },
+  ];
+  function themeForLevel(n) {
+    return MAP_THEMES[Math.floor((n - 1) / 10) % MAP_THEMES.length];
+  }
+
   function showLevelSelect() {
     const profile = state.profile;
     const map = document.getElementById("level-list");
@@ -1989,7 +2047,31 @@
     map.style.height = totalHeight + "px";
     const points = nodeLevels.map((_, i) => [levelNodeX(i), levelNodeY(i)]);
 
-    map.innerHTML = `<svg class="level-path" viewBox="0 0 100 ${totalHeight}" preserveAspectRatio="none" width="100%" height="${totalHeight}" aria-hidden="true">
+    // Group consecutive same-theme nodes into one tinted band each, rather
+    // than re-tinting behind every single node.
+    let bandsHTML = "";
+    let band = null;
+    nodeLevels.forEach((n, i) => {
+      const theme = themeForLevel(n);
+      const y = points[i][1];
+      if (band && band.theme === theme) {
+        band.minY = Math.min(band.minY, y);
+        band.maxY = Math.max(band.maxY, y);
+      } else {
+        if (band) bandsHTML += renderThemeBand(band);
+        band = { theme, minY: y, maxY: y };
+      }
+    });
+    if (band) bandsHTML += renderThemeBand(band);
+    function renderThemeBand(b) {
+      const top = b.minY - LEVEL_NODE_SPACING_Y / 2;
+      const height = b.maxY - b.minY + LEVEL_NODE_SPACING_Y;
+      return `<div class="map-theme-band" style="top:${top}px;height:${height}px;background:rgba(${b.theme.tint},0.12);">
+        <span class="map-theme-label">${b.theme.emoji} ${b.theme.name}</span>
+      </div>`;
+    }
+
+    map.innerHTML = bandsHTML + `<svg class="level-path" viewBox="0 0 100 ${totalHeight}" preserveAspectRatio="none" width="100%" height="${totalHeight}" aria-hidden="true">
       <polyline points="${points.map((p) => p.join(",")).join(" ")}" fill="none" stroke="var(--panel-line)" stroke-width="1.5" stroke-dasharray="1.5 3.5" stroke-linecap="round"/>
     </svg>`;
 
@@ -2022,6 +2104,28 @@
       });
       map.appendChild(btn);
     });
+
+    // Where everyone else in the family currently is, so the map doubles as
+    // a live "you are here" view of the whole household - not just yours.
+    // Clamped to this map's own visible range (this player's own locked
+    // teaser at most), since that's as far as the path is drawn here.
+    state.profiles
+      .filter((p) => p.id !== profile.id)
+      .forEach((other, oi) => {
+        const otherLevel = Math.min(other.highestLevelUnlocked || 1, highest + 1);
+        const idx = nodeLevels.indexOf(otherLevel);
+        if (idx === -1) return;
+        const [x, y] = points[idx];
+        const marker = document.createElement("div");
+        marker.className = "player-marker";
+        marker.style.left = x + "%";
+        marker.style.top = y + "px";
+        marker.style.transform = `translate(-50%, -50%) translate(${18 + oi * 14}px, -18px)`;
+        marker.title = `${other.name} - Level ${other.highestLevelUnlocked || 1}`;
+        marker.innerHTML = avatarHTML(other.avatar, { stars: totalStars(other) });
+        map.appendChild(marker);
+      });
+
     map.scrollTop = 0; // always land at the top (the newest levels), even on reopen
 
     showOverlay("overlay-levels");
