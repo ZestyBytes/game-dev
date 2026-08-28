@@ -138,6 +138,12 @@
     align-items: baseline;
   }
   .stat b { color: var(--accent); font-size: 0.95rem; }
+  .stat.stat-warn { animation: stat-warn-pulse 1s ease-in-out infinite; }
+  .stat.stat-warn b { color: #c0324f; }
+  @keyframes stat-warn-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
 
   /* A small round icon-only button - the in-game "back to levels" control,
      and the customize/leaderboard/switch-player row on the level map, so
@@ -342,10 +348,12 @@
     flex-direction: column;
     gap: 6px;
   }
-  /* Fills right after every move, then drains - swap again before it empties
-     for a score bonus (see attemptSwap/currentMoveMultiplier). Purely a
-     speed reward: taking your time never costs anything, it just skips the
-     bonus. */
+  /* Fills right after every move, then drains over BONUS_WINDOW_MS - swap
+     again before it empties for a score bonus (see attemptSwap /
+     currentMoveMultiplier). Driven directly from JS (restartBonusBar), not
+     a CSS animation, so the countdown label under it can stay in sync.
+     Purely a speed reward: taking your time never costs anything, it just
+     skips the bonus. */
   .bonus-bar-track {
     width: 100%;
     height: 8px;
@@ -359,11 +367,15 @@
     border-radius: 999px;
     background: linear-gradient(90deg, var(--power-row), var(--accent));
     transform-origin: left;
-    animation: bonus-drain 5s linear forwards;
+    transform: scaleX(1);
   }
-  @keyframes bonus-drain {
-    from { transform: scaleX(1); }
-    to { transform: scaleX(0); }
+  .bonus-label {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: center;
+    min-height: 1.2em;
+    font-variant-numeric: tabular-nums;
   }
   .message {
     font-weight: 700;
@@ -745,7 +757,9 @@
       <div class="stat">Moves <b id="stat-moves">20</b></div>
     </div>
     <button class="sound-toggle" id="btn-sound-toggle" title="Toggle sound" aria-label="Toggle sound" hidden>🔊</button>
-    <button class="icon-btn" id="btn-quit-round" title="Back to levels" aria-label="Back to levels" hidden>&#128281;</button>
+    <button class="icon-btn" id="btn-quit-round" title="Back to levels" aria-label="Back to levels" hidden>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 5l-8 7 8 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
   </div>
 
   <div class="board" id="board" role="grid" aria-label="Candy board"></div>
@@ -755,6 +769,7 @@
     <div class="bonus-bar-track" title="Move fast for a score bonus!">
       <div class="bonus-bar-fill" id="bonus-fill"></div>
     </div>
+    <div class="bonus-label" id="bonus-label"></div>
   </div>
 
   <!-- Who's playing -->
@@ -1187,6 +1202,36 @@
     return runs;
   }
 
+  // Merges a row-run and a col-run that share a cell (an L, T, or + shape)
+  // into one combined shape that always becomes a color bomb at the shared
+  // cell, regardless of how long either arm is on its own - a plain 3-long
+  // row run crossing a plain 3-long col run is exactly the classic "T of
+  // three by three" shape and should bomb just like a real 5-in-a-row does.
+  // Runs that don't intersect anything keep the existing length-based rules
+  // (4 long -> stripe, 5+ -> bomb) applied later in resolveBoardSteps.
+  function groupMatchShapes(runs) {
+    const rowRuns = runs.filter((r) => r.dir === "row");
+    const colRuns = runs.filter((r) => r.dir === "col");
+    const usedCol = new Set();
+    const shapes = [];
+
+    rowRuns.forEach((rr) => {
+      const j = colRuns.findIndex((cr, idx) => !usedCol.has(idx) && rr.cells.some((p) => cr.cells.some((q) => q[0] === p[0] && q[1] === p[1])));
+      if (j === -1) {
+        shapes.push(rr);
+        return;
+      }
+      const cr = colRuns[j];
+      usedCol.add(j);
+      const anchor = rr.cells.find((p) => cr.cells.some((q) => q[0] === p[0] && q[1] === p[1]));
+      const merged = new Map();
+      [...rr.cells, ...cr.cells].forEach((p) => merged.set(keyOf(p), p));
+      shapes.push({ cells: [...merged.values()], special: "color", anchor });
+    });
+    colRuns.forEach((cr, j) => { if (!usedCol.has(j)) shapes.push(cr); });
+    return shapes;
+  }
+
   // Generates a board with no matches already on it, AND at least one legal
   // move available (regenerating from scratch on the rare unplayable roll -
   // astronomically unlikely on an 8x8 board with 5 types, but a silently
@@ -1267,12 +1312,19 @@
       const clearSet = new Map(); // key -> [r,c]
       const newSpecials = new Map(); // key -> special type
 
-      for (const run of runs) {
-        const { cells, dir } = run;
-        if (cells.length >= 4) {
+      for (const shape of groupMatchShapes(runs)) {
+        const { cells } = shape;
+        if (shape.special === "color") {
+          // An L/T/+ crossing of a row-run and a col-run - always a bomb at
+          // the shared cell, whatever length either arm is on its own.
+          newSpecials.set(keyOf(shape.anchor), "color");
+          for (const p of cells) {
+            if (p[0] !== shape.anchor[0] || p[1] !== shape.anchor[1]) clearSet.set(keyOf(p), p);
+          }
+        } else if (cells.length >= 4) {
           const swappedInRun = swappedPos && cells.some((p) => p[0] === swappedPos[0] && p[1] === swappedPos[1]);
           const anchor = swappedInRun ? swappedPos : cells[Math.floor(cells.length / 2)];
-          newSpecials.set(keyOf(anchor), cells.length >= 5 ? "color" : dir);
+          newSpecials.set(keyOf(anchor), cells.length >= 5 ? "color" : shape.dir);
           for (const p of cells) {
             if (p[0] !== anchor[0] || p[1] !== anchor[1]) clearSet.set(keyOf(p), p);
           }
@@ -1451,6 +1503,7 @@
     message: document.getElementById("message"),
     quitBtn: document.getElementById("btn-quit-round"),
     bonusFill: document.getElementById("bonus-fill"),
+    bonusLabel: document.getElementById("bonus-label"),
     level: document.getElementById("stat-level"),
   };
 
@@ -1655,6 +1708,9 @@
     el.moves.textContent = state.movesLeft;
     el.target.textContent = state.target;
     el.level.textContent = state.level;
+    // A gentle heads-up once moves are running low, so running out never
+    // feels like it came out of nowhere.
+    el.moves.parentElement.classList.toggle("stat-warn", state.movesLeft > 0 && state.movesLeft <= 3);
   }
 
   function sleep(ms) { return new Promise((res) => setTimeout(res, ms)); }
@@ -1708,21 +1764,38 @@
   // Speed bonus: swap again before the bar under the board empties for a
   // score multiplier on that move - purely a reward for playing fast, never
   // a penalty for taking your time (it just settles back to a plain 1x).
+  // Driven by a rAF loop (not a CSS animation) so the bar and the seconds/
+  // multiplier readout under it always agree, and it can express a full
+  // minute-long window smoothly rather than just looping a CSS keyframe.
   // ---------------------------------------------------------------------
-  const BONUS_WINDOW_MS = 5000;
+  const BONUS_WINDOW_MS = 60000;
   const BONUS_MAX_MULTIPLIER = 1.5;
   let lastMoveAt = 0;
+  let bonusRAF = null;
 
   function currentMoveMultiplier() {
     const elapsed = performance.now() - lastMoveAt;
     const frac = Math.max(0, 1 - elapsed / BONUS_WINDOW_MS);
     return 1 + (BONUS_MAX_MULTIPLIER - 1) * frac;
   }
+  function tickBonusBar() {
+    const elapsed = performance.now() - lastMoveAt;
+    const frac = Math.max(0, 1 - elapsed / BONUS_WINDOW_MS);
+    el.bonusFill.style.transform = `scaleX(${frac})`;
+    if (frac <= 0) {
+      el.bonusLabel.textContent = "";
+      bonusRAF = null;
+      return; // nothing left to animate until the next move restarts this
+    }
+    const secondsLeft = Math.max(1, Math.ceil((BONUS_WINDOW_MS - elapsed) / 1000));
+    const multiplierNow = 1 + (BONUS_MAX_MULTIPLIER - 1) * frac;
+    el.bonusLabel.textContent = `${secondsLeft}s left for ${multiplierNow.toFixed(1)}x bonus`;
+    bonusRAF = requestAnimationFrame(tickBonusBar);
+  }
   function restartBonusBar() {
     lastMoveAt = performance.now();
-    el.bonusFill.style.animation = "none";
-    void el.bonusFill.offsetWidth; // force reflow so the restart actually restarts
-    el.bonusFill.style.animation = "";
+    if (bonusRAF) cancelAnimationFrame(bonusRAF);
+    tickBonusBar();
   }
 
   // ---------------------------------------------------------------------
