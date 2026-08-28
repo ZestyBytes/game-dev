@@ -1,0 +1,2187 @@
+<meta charset="utf-8">
+<title>Gumdrop Cascade</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+
+<style>
+  :root {
+    --bg: #f6f1ff;
+    --bg-glow: #ffffff;
+    --panel: #ffffff;
+    --panel-line: #e6dbf9;
+    --ink: #2c2148;
+    --muted: #7c6f9c;
+    --accent: #e23e90;
+    --accent-ink: #ffffff;
+    --accent-soft: #fbe4f1;
+    --shadow: 222deg 45% 30%;
+
+    --c-circle: #ef5364;
+    --c-circle-d: #c73348;
+    --c-square: #2fbf78;
+    --c-square-d: #1f9860;
+    --c-triangle: #ffbe3d;
+    --c-triangle-d: #e69518;
+    --c-diamond: #4c8cf0;
+    --c-diamond-d: #2f66c9;
+    --c-cross: #b36bf0;
+    --c-cross-d: #8a45c9;
+
+    --power-row: #ffb703;
+    --power-col: #21c3e0;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #180f2a;
+      --bg-glow: #241640;
+      --panel: #221439;
+      --panel-line: #3c2a5c;
+      --ink: #f3ecff;
+      --muted: #a598c4;
+      --accent: #ff5fac;
+      --accent-ink: #2a0e1f;
+      --accent-soft: #3a1f38;
+      --shadow: 260deg 60% 4%;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #180f2a;
+    --bg-glow: #241640;
+    --panel: #221439;
+    --panel-line: #3c2a5c;
+    --ink: #f3ecff;
+    --muted: #a598c4;
+    --accent: #ff5fac;
+    --accent-ink: #2a0e1f;
+    --accent-soft: #3a1f38;
+    --shadow: 260deg 60% 4%;
+  }
+
+  * { box-sizing: border-box; }
+
+  /* Exactly one scroll region at a time: whichever modal is open (or the
+     board itself, as a last resort on very short screens) - never the
+     page underneath it too. */
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; touch-action: none; }
+
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 50% -10%, var(--bg-glow), var(--bg) 60%);
+    color: var(--ink);
+    font-family: "Nunito", ui-sans-serif, system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(10px, 3vw, 32px);
+  }
+
+  .cabinet {
+    width: min(560px, 100%);
+    max-height: 100%;
+    background: var(--panel);
+    border: 3px solid var(--panel-line);
+    border-radius: 28px;
+    padding: clamp(16px, 3vw, 28px);
+    box-shadow: 0 24px 60px -20px hsl(var(--shadow) / 0.55);
+    position: relative;
+    overflow-y: auto; /* fallback only - the board itself should always fit */
+    touch-action: pan-y; /* re-allow scrolling here despite html/body's blanket touch-action:none */
+  }
+
+  .header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    font-family: "Baloo 2", ui-rounded, sans-serif;
+    font-weight: 800;
+    font-size: clamp(1.3rem, 4vw, 1.7rem);
+    margin: 0;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+    color: var(--accent);
+  }
+
+  .stats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 5px 10px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    display: flex;
+    gap: 5px;
+    align-items: baseline;
+  }
+  .stat b { color: var(--accent); font-size: 0.95rem; }
+
+  .player-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: "Nunito";
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .quit-round {
+    margin-left: auto;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--muted);
+    background: transparent;
+    border: 2px solid var(--panel-line);
+    border-radius: 10px;
+    padding: 4px 10px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .quit-round:hover, .quit-round:focus-visible { color: var(--accent); border-color: var(--accent); }
+  .player-chip .avatar-stack { font-size: 1.15rem; }
+
+  /* One SVG gem per player (see gemSVG/avatarHTML): "small" is the compact
+     size used everywhere space is tight, "full" is the big customize-screen
+     preview. Same viewBox either way - just a size swap. */
+  .avatar-stack {
+    display: inline-block;
+    line-height: 1;
+    vertical-align: middle;
+  }
+  .avatar-svg {
+    display: block;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25));
+  }
+  .avatar-stack.small .avatar-svg { width: 30px; height: 30px; }
+  .avatar-stack.full .avatar-svg { width: 150px; height: 150px; overflow: visible; }
+  .gem-live { animation: gem-breathe 2.6s ease-in-out infinite; transform-origin: center; }
+  @keyframes gem-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.045); }
+  }
+  .gem-sparkle {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: gem-sparkle-twinkle 1.8s ease-in-out infinite;
+  }
+  @keyframes gem-sparkle-twinkle {
+    0%, 100% { opacity: 0.15; transform: scale(0.7); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+  .gem-orbit {
+    transform-box: view-box;
+    transform-origin: 50px 48px;
+    animation: gem-orbit-spin 7s linear infinite;
+  }
+  @keyframes gem-orbit-spin { to { transform: rotate(360deg); } }
+  .gem-aura {
+    transform-box: view-box;
+    transform-origin: 50px 48px;
+    animation: gem-aura-spin 9s linear infinite;
+  }
+  @keyframes gem-aura-spin { to { transform: rotate(360deg); } }
+
+  .board {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: clamp(3px, 0.8vw, 6px);
+    background: var(--panel-line);
+    border-radius: 18px;
+    padding: clamp(6px, 1.4vw, 10px);
+    aspect-ratio: 1 / 1;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  .cell {
+    position: relative;
+    background: color-mix(in srgb, var(--panel) 88%, var(--panel-line));
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: 3px solid transparent;
+    outline-offset: -3px;
+    transition: outline-color 120ms ease, background 120ms ease;
+  }
+  .cell.cursor { outline-color: var(--accent); }
+  .cell.selected { background: color-mix(in srgb, var(--accent) 22%, var(--panel)); }
+
+  .candy {
+    width: 74%;
+    height: 74%;
+    position: relative;
+    cursor: grab;
+    filter: drop-shadow(0 3px 3px hsl(var(--shadow) / 0.35));
+    transition: transform 140ms cubic-bezier(.34,1.56,.64,1);
+  }
+  .candy:active { cursor: grabbing; }
+  .candy.flash { animation: pop-flash 220ms ease-in-out; }
+  .candy.dropping { animation: drop-in 260ms cubic-bezier(.2,.8,.3,1.1); }
+  .candy.popping { animation: pop-out 200ms ease-in forwards; }
+  .candy.hint { animation: hint-pulse 1s ease-in-out infinite; }
+  @keyframes hint-pulse {
+    0%, 100% { filter: drop-shadow(0 3px 3px hsl(var(--shadow) / 0.35)) brightness(1); }
+    50% { filter: drop-shadow(0 3px 3px hsl(var(--shadow) / 0.35)) brightness(1.4); }
+  }
+
+  @keyframes pop-flash {
+    0%, 100% { filter: drop-shadow(0 3px 3px hsl(var(--shadow) / 0.35)) brightness(1); transform: scale(1); }
+    50% { filter: drop-shadow(0 3px 3px hsl(var(--shadow) / 0.35)) brightness(1.9); transform: scale(1.18); }
+  }
+  @keyframes drop-in {
+    0% { transform: translateY(-130%); opacity: 0.2; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes pop-out {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.2); opacity: 0; }
+  }
+
+  .shape { width: 100%; height: 100%; display: block; }
+
+  .power-ring {
+    position: absolute;
+    inset: -14%;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: ring-pulse 1.3s ease-in-out infinite;
+  }
+  .power-ring.row { box-shadow: 0 0 0 3px var(--power-row); }
+  .power-ring.col { box-shadow: 0 0 0 3px var(--power-col); }
+  .power-ring.bomb {
+    background: conic-gradient(from 0deg, #ff5fac, #ffd23f, #4c8cf0, #ff5fac);
+    opacity: 0.55;
+    animation: ring-pulse 1.3s ease-in-out infinite, spin 2.4s linear infinite;
+  }
+  @keyframes ring-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.94); }
+    50% { opacity: 0.9; transform: scale(1.08); }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Floating "+N" text where a match just cleared. */
+  .score-popup {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-family: "Baloo 2", sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--accent);
+    text-shadow: 0 1px 0 var(--panel), 0 2px 6px rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+    white-space: nowrap;
+    animation: score-float 900ms ease-out forwards;
+    z-index: 5;
+  }
+  @keyframes score-float {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+    15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+    100% { opacity: 0; transform: translate(-50%, -170%) scale(1); }
+  }
+
+  /* A brief wiggle on a big or combo clear. */
+  .board.shake { animation: board-shake 320ms ease; }
+  @keyframes board-shake {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(-6px, 2px); }
+    40% { transform: translate(5px, -3px); }
+    60% { transform: translate(-4px, 3px); }
+    80% { transform: translate(3px, -2px); }
+  }
+
+  /* Escalating combo callout ("Sweet!" -> "SUGAR RUSH!") pulses in. */
+  .message.combo { animation: combo-pop 260ms ease; }
+  @keyframes combo-pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.18); }
+    100% { transform: scale(1); }
+  }
+
+  .sound-toggle {
+    font-size: 1.1rem;
+    line-height: 1;
+    background: transparent;
+    border: 2px solid var(--panel-line);
+    border-radius: 10px;
+    padding: 4px 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .sound-toggle:hover, .sound-toggle:focus-visible { border-color: var(--accent); }
+
+  .footer {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .message {
+    font-weight: 700;
+    color: var(--accent);
+    min-height: 1.2em;
+    font-size: 0.92rem;
+  }
+  /* --- overlay modals --- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(6px);
+    border-radius: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .overlay[hidden] { display: none; }
+
+  .modal {
+    background: var(--panel);
+    border: 3px solid var(--panel-line);
+    border-radius: 20px;
+    padding: 22px;
+    width: min(380px, 100%);
+    max-height: min(85vh, 640px);
+    overflow-y: auto;
+    text-align: center;
+  }
+  .modal h2 {
+    font-family: "Baloo 2", sans-serif;
+    font-size: 1.3rem;
+    margin: 0 0 4px;
+    color: var(--accent);
+  }
+  .modal p.sub { color: var(--muted); margin: 0 0 16px; font-size: 0.88rem; }
+
+  .profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .profile-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 14px;
+    border-radius: 12px;
+    border: 2px solid var(--panel-line);
+    background: transparent;
+    font: inherit;
+    font-weight: 700;
+    color: var(--ink);
+    cursor: pointer;
+    text-align: left;
+    touch-action: manipulation;
+  }
+  .profile-row:hover, .profile-row:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+  .profile-row-wrap { display: flex; gap: 8px; align-items: stretch; }
+  .profile-row-wrap .profile-row { flex: 1; }
+  .delete-profile {
+    flex-shrink: 0;
+    width: 44px;
+    border-radius: 12px;
+    border: 2px solid var(--panel-line);
+    background: transparent;
+    font-size: 1.1rem;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .delete-profile:hover { border-color: #c0324f; background: color-mix(in srgb, #c0324f 15%, transparent); }
+  .confirm-text {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .confirm-yes {
+    background: #c0324f;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .confirm-no {
+    background: transparent;
+    border: 2px solid var(--panel-line);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font: inherit;
+    font-weight: 700;
+    color: var(--muted);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .profile-row .avatar-stack { font-size: 1.4rem; }
+  .profile-row .new-label { color: var(--accent); }
+
+  .btn {
+    font: inherit;
+    font-family: "Baloo 2", sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--accent-ink);
+    background: var(--accent);
+    border: none;
+    border-radius: 14px;
+    padding: 14px 20px;
+    cursor: pointer;
+    width: 100%;
+    touch-action: manipulation;
+    transition: transform 100ms ease, filter 100ms ease;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible, .profile-row:focus-visible, input:focus-visible, .avatar-pick:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .btn.ghost { background: transparent; color: var(--muted); border: 2px solid var(--panel-line); margin-top: 8px; }
+
+  input[type="text"] {
+    font: inherit;
+    font-size: 1rem;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 2px solid var(--panel-line);
+    background: color-mix(in srgb, var(--panel) 96%, var(--panel-line));
+    color: var(--ink);
+    margin-bottom: 14px;
+  }
+
+  .avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .avatar-pick {
+    padding: 12px 0;
+    border-radius: 12px;
+    border: 2px solid var(--panel-line);
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .avatar-pick.chosen { border-color: var(--accent); background: var(--accent-soft); }
+
+  .avatar-preview {
+    display: flex;
+    justify-content: center;
+    margin: 6px 0 18px;
+  }
+  .cosmetic-slots {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .cosmetic-item {
+    position: relative;
+    font-size: 1.4rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    border: 2px solid var(--panel-line);
+    background: color-mix(in srgb, var(--panel) 80%, white); /* neutral backing so dark-colored gear stays visible */
+    cursor: pointer;
+    touch-action: manipulation;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cosmetic-item.equipped { border-color: var(--accent); background: var(--accent-soft); }
+  .cosmetic-item.locked { opacity: 0.4; cursor: not-allowed; font-size: 1.1rem; }
+  .cosmetic-item .req {
+    position: absolute;
+    bottom: -6px;
+    right: -6px;
+    font-family: "JetBrains Mono";
+    font-size: 0.55rem;
+    background: var(--panel-line);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 1px 3px;
+  }
+
+  .leaderboard {
+    list-style: none;
+    margin: 0 0 16px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+  }
+  .leaderboard li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--panel) 90%, var(--panel-line));
+    border: 2px solid transparent;
+  }
+  .leaderboard li.mine {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .leaderboard .rank { font-family: "JetBrains Mono"; color: var(--muted); width: 1.4em; }
+  .leaderboard .avatar-stack { font-size: 1.4rem; }
+  .leaderboard .name { flex: 1; font-weight: 700; }
+  .leaderboard .pts { font-family: "JetBrains Mono"; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .leaderboard .empty { color: var(--muted); text-align: center; padding: 10px; }
+  .leaderboard .level-tag { font-size: 0.72rem; color: var(--muted); }
+
+  .stars { font-size: 0.9rem; letter-spacing: 1px; white-space: nowrap; }
+  .stars .lit { color: var(--power-row); }
+  .stars .dim { color: var(--panel-line); }
+  .star-row {
+    font-size: 2.2rem;
+    letter-spacing: 6px;
+    text-align: center;
+    margin: 4px 0 16px;
+  }
+  .star-row .lit { color: var(--power-row); text-shadow: 0 0 14px color-mix(in srgb, var(--power-row) 60%, transparent); }
+  .star-row .dim { color: var(--panel-line); }
+
+  /* A winding path of level nodes (see showLevelSelect) rather than a plain
+     list - each node's horizontal position comes from a sine wave, so the
+     path snakes down the modal instead of running in a straight column. */
+  .level-map {
+    position: relative;
+    margin: 0 0 14px;
+    max-height: 46vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .level-path { position: absolute; top: 0; left: 0; pointer-events: none; }
+  .level-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    border: 3px solid var(--panel-line);
+    background: var(--panel);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 0 var(--panel-line);
+  }
+  .level-node:hover, .level-node:focus-visible { border-color: var(--accent); }
+  .level-node .num {
+    font-family: "Baloo 2", sans-serif;
+    font-weight: 800;
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+  .level-node .mini-stars { font-size: 0.42rem; letter-spacing: 1px; margin-top: 2px; }
+  .level-node.cleared { border-color: var(--accent); background: var(--accent-soft); }
+  .level-node.cleared .num { color: var(--accent); }
+  .level-node.next {
+    border-color: var(--accent);
+    box-shadow: 0 3px 0 var(--panel-line), 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent);
+    animation: node-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes node-pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.08); }
+  }
+  .level-node.locked {
+    cursor: not-allowed;
+    opacity: 0.55;
+    box-shadow: none;
+  }
+  .level-node.locked .num { color: var(--muted); font-size: 1.3rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+</style>
+
+<script id="shared-state" type="application/json">{"profiles":[{"id":"mtdcz1om-43894","name":"Molly","avatar":{"color":"citrine"},"highestLevelUnlocked":3,"levelStars":{"1":1,"2":3}},{"id":"mtdd1doy-pkmdn","name":"Dad","avatar":{"color":"sapphire"},"highestLevelUnlocked":10,"levelStars":{"1":2,"2":3,"3":2,"4":2,"5":1,"6":3,"7":1,"8":1,"9":1}}]}</script>
+<div class="cabinet" id="cabinet">
+  <!-- Shared filter defs for the gem avatar's glow (see gemGlow). Placed as
+       the cabinet's first child, not a body-level sibling: anything before
+       the cabinet div gets swept into the page's implied <head> (see the
+       PRISTINE_BODY_HTML comment below) and would silently vanish from the
+       captured template. -->
+  <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+    <defs>
+      <filter id="gem-blur" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="6" />
+      </filter>
+    </defs>
+  </svg>
+  <div class="header">
+    <h1>Gumdrop Cascade</h1>
+    <div class="stats">
+      <div class="stat">Level <b id="stat-level">1</b></div>
+      <div class="stat">Score <b id="stat-score">0</b></div>
+      <div class="stat">Target <b id="stat-target">400</b></div>
+      <div class="stat">Moves <b id="stat-moves">20</b></div>
+    </div>
+    <button class="sound-toggle" id="btn-sound-toggle" title="Toggle sound" aria-label="Toggle sound">🔊</button>
+  </div>
+  <div class="player-chip" id="player-chip" hidden>
+    <span class="avatar" id="player-avatar"></span>
+    <span id="player-name"></span>
+    <button class="quit-round" id="btn-quit-round" title="Back to levels" aria-label="Back to levels">&#8592; Levels</button>
+  </div>
+
+  <div class="board" id="board" role="grid" aria-label="Candy board"></div>
+
+  <div class="footer">
+    <div class="message" id="message">Good luck!</div>
+  </div>
+
+  <!-- Who's playing -->
+  <div class="overlay" id="overlay-profiles">
+    <div class="modal">
+      <h2>Gumdrop Cascade</h2>
+      <p class="sub">Who's playing?</p>
+      <div class="profile-list" id="profile-list"></div>
+      <button class="btn" id="btn-new-player">+ New Player</button>
+    </div>
+  </div>
+
+  <!-- new player: name -->
+  <div class="overlay" id="overlay-name" hidden>
+    <div class="modal">
+      <h2>New Player</h2>
+      <p class="sub">What's your name?</p>
+      <input type="text" id="name-input" maxlength="14" placeholder="Type your name" autocomplete="off" />
+      <button class="btn" id="btn-name-next">Next</button>
+    </div>
+  </div>
+
+  <!-- new player: avatar -->
+  <div class="overlay" id="overlay-avatar" hidden>
+    <div class="modal">
+      <h2>Pick your gem</h2>
+      <p class="sub" id="avatar-sub">Choose one, friend!</p>
+      <div class="avatar-grid" id="avatar-grid"></div>
+      <button class="btn" id="btn-avatar-confirm">Let's play!</button>
+    </div>
+  </div>
+
+  <!-- level select (main hub) -->
+  <div class="overlay" id="overlay-levels" hidden>
+    <div class="modal">
+      <h2>Level Select</h2>
+      <p class="sub" id="levels-sub"></p>
+      <div class="level-map" id="level-list"></div>
+      <button class="btn ghost" id="btn-open-customize">&#128142; Customize Gem</button>
+      <button class="btn ghost" id="btn-show-leaderboard">&#127942; Family Leaderboard</button>
+      <button class="btn ghost" id="btn-switch-player">Switch player</button>
+    </div>
+  </div>
+
+  <!-- avatar customization -->
+  <div class="overlay" id="overlay-customize" hidden>
+    <div class="modal">
+      <h2>Customize Gem</h2>
+      <p class="sub" id="customize-sub"></p>
+      <div class="avatar-preview" id="avatar-preview"></div>
+      <div class="cosmetic-slots" id="cosmetic-slots"></div>
+      <button class="btn" id="btn-customize-save">Save</button>
+      <button class="btn ghost" id="btn-customize-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- family leaderboard -->
+  <div class="overlay" id="overlay-leaderboard" hidden>
+    <div class="modal">
+      <h2>Family Leaderboard</h2>
+      <p class="sub">Ranked by total stars</p>
+      <ol class="leaderboard" id="leaderboard-list"></ol>
+      <button class="btn" id="btn-close-leaderboard">Back</button>
+    </div>
+  </div>
+
+  <!-- game over -->
+  <div class="overlay" id="overlay-gameover" hidden>
+    <div class="modal">
+      <h2 id="gameover-title">Game Over</h2>
+      <p class="sub" id="gameover-sub"></p>
+      <div class="star-row" id="gameover-stars"></div>
+      <button class="btn" id="btn-next-level">Next Level</button>
+      <button class="btn" id="btn-retry-level" hidden>Retry Level</button>
+      <button class="btn ghost" id="btn-to-levels">Level Select</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // Pristine template capture (must run before anything else touches the
+  // DOM). Republishing a shared update needs a genuine full document, not
+  // a snapshot of the live/mutated page - see PUBLISHING below.
+  //
+  // This file has no explicit <head>/<body> tags (by design, for the
+  // Artifact tool's authoring style), which means the HTML5 parser's
+  // implied-head algorithm quietly sorts <style> and <script> tags that
+  // appear before the first real body element (the .cabinet div) into an
+  // IMPLIED <head> - including the "shared-state" data tag, even though
+  // it's written right next to the body markup. getElementById() still
+  // finds it fine (that's why reading state works), but document.body
+  // never contains it - so it's captured separately here, explicitly.
+  // ---------------------------------------------------------------------
+  // Defensively strip any shared-state tag that ended up inside body (a
+  // page generation built before the head/body fix above could have baked
+  // a stale, never-updated copy in here - without this, every republish
+  // would keep carrying that orphan forward unchanged).
+  const PRISTINE_BODY_HTML = document.body.innerHTML.replace(
+    /<script id="shared-state" type="application\/json">[\s\S]*?<\/script>/g,
+    ""
+  ); // includes this very <script> as its last child
+  const STYLE_TAG_HTML = document.querySelector("style").outerHTML;
+  const STATE_TAG_HTML = document.getElementById("shared-state").outerHTML;
+
+  // ---------------------------------------------------------------------
+  // Config
+  // ---------------------------------------------------------------------
+  const BOARD_SIZE = 8;
+  const CANDY_TYPES = ["circle", "square", "triangle", "diamond", "cross"];
+
+  const FLASH_MS = 220;
+  const SETTLE_MS = 260;
+
+  // ---------------------------------------------------------------------
+  // Levels: a hand-tuned ladder for the first 10, then a gentle formula so
+  // there's always a next level however far a player gets.
+  // ---------------------------------------------------------------------
+  // Tuned against measured play, not guesswork: even fully random adjacent
+  // swaps median ~930 pts in 12 moves and ~1410 pts in 20 (see calibration
+  // notes). Early levels sit below that so a beginner wins comfortably;
+  // later levels sit at/above the high end so real skill (spotting matches,
+  // setting up power candies) is required, not just moves.
+  const LEVEL_TABLE = [
+    { target: 550, moves: 10 },
+    { target: 750, moves: 12 },
+    { target: 950, moves: 13 },
+    { target: 1150, moves: 14 },
+    { target: 1350, moves: 15 },
+    { target: 1550, moves: 16 },
+    { target: 1750, moves: 17 },
+    { target: 1950, moves: 18 },
+    { target: 2150, moves: 19 },
+    { target: 2400, moves: 20 },
+  ];
+  function levelConfig(n) {
+    if (n <= LEVEL_TABLE.length) return LEVEL_TABLE[n - 1];
+    const extra = n - LEVEL_TABLE.length;
+    return { target: 2400 + extra * 300, moves: Math.min(20 + Math.ceil(extra / 2), 30) };
+  }
+  // Stars are about how comfortably you won, not just whether you did.
+  function starsForResult(movesLeft, totalMoves) {
+    const spare = movesLeft / totalMoves;
+    if (spare >= 0.5) return 3;
+    if (spare >= 0.25) return 2;
+    return 1;
+  }
+  function totalStars(profile) {
+    return Object.values(profile.levelStars || {}).reduce((sum, n) => sum + n, 0);
+  }
+
+  // ---------------------------------------------------------------------
+  // Shared state & publishing
+  //
+  // The player roster (profiles, level progress, avatars) is meant to be
+  // shared live across everyone's devices - a laptop and a phone open on
+  // the same artifact should see the same leaderboard. That needs the
+  // `artifact` runtime capability: this page republishes ITSELF (the full
+  // document, with updated state embedded) whenever something worth
+  // sharing happens, and the platform reloads every open view to match.
+  //
+  // When that capability isn't available (opened as a bare local file,
+  // during development, or a viewer without edit access) everything still
+  // works using this browser's own localStorage - just not shared.
+  // ---------------------------------------------------------------------
+  const STORE_PROFILES_FALLBACK = "gumdropCascade.profiles";
+  const STORE_MY_PROFILE_ID = "gumdropCascade.myProfileId";
+
+  // A capability's `use()` promise can take a moment to resolve (the doc
+  // says up to ~10s worst case) - awaiting THIS promise (memoized, so
+  // cheap to await repeatedly) instead of racing a synchronous variable
+  // means a save that happens quickly after load still waits for the real
+  // answer instead of silently falling back to local-only storage.
+  const artifactCapPromise =
+    typeof window.claude !== "undefined" && typeof window.claude.use === "function"
+      ? window.claude.use("artifact").catch(() => null)
+      : Promise.resolve(null);
+  let writeDisabled = false; // set once a viewer is confirmed read-only
+
+  function loadList(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data : [];
+    } catch { return []; }
+  }
+  function saveList(key, list) {
+    try { localStorage.setItem(key, JSON.stringify(list)); } catch { /* ignore */ }
+  }
+  function makeProfileId() { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`; }
+
+  function readEmbeddedState() {
+    try {
+      const tag = document.getElementById("shared-state");
+      const data = JSON.parse(tag.textContent || "{}");
+      return { profiles: Array.isArray(data.profiles) ? data.profiles : [] };
+    } catch { return { profiles: [] }; }
+  }
+
+  function loadInitialProfiles() {
+    const embedded = readEmbeddedState();
+    if (embedded.profiles.length) return embedded.profiles;
+    // Nothing shared yet (fresh artifact) - fall back to whatever this
+    // browser has saved locally (mainly useful for local development).
+    return loadList(STORE_PROFILES_FALLBACK);
+  }
+
+  // Builds a genuine, complete replacement document for artifact.publish():
+  // the platform's own runtime frame is NOT something we should round-trip,
+  // so this reconstructs a plain document from the page's own pristine
+  // parts (captured before any rendering touched the DOM) plus the new
+  // state, rather than serializing the live/mutated page.
+  function buildFullDocument(newState) {
+    const json = JSON.stringify(newState).replace(/</g, "\\u003c");
+    const patchedStateTag = STATE_TAG_HTML.replace(
+      /(<script id="shared-state" type="application\/json">)([\s\S]*?)(<\/script>)/,
+      (_m, open, _old, close) => open + json + close
+    );
+    return (
+      "<!doctype html>\n<html><head>" +
+      '<meta charset="utf-8">' +
+      "<title>Gumdrop Cascade</title>" +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap">' +
+      STYLE_TAG_HTML +
+      patchedStateTag +
+      "</head><body>" +
+      PRISTINE_BODY_HTML +
+      "</body></html>"
+    );
+  }
+
+  // Set whenever a save falls back to local-only for a reason connectivity
+  // might fix (offline, or the capability just hasn't loaded yet) - NOT for
+  // a conflict (the shell is already reloading to the winner) or a
+  // permissions issue (retrying won't help). Drives the "online" listener
+  // below: this device's real progress is never lost, just held locally
+  // until it can actually reach the shared leaderboard again.
+  let pendingSync = false;
+
+  // The single place that persists a change to the roster. Optimistically
+  // updates in-memory state first (so the UI reacts immediately), then
+  // tries to share it; falls back to a local-only save if sharing isn't
+  // possible right now.
+  async function saveProfiles(profiles) {
+    state.profiles = profiles;
+    const artifactCap = writeDisabled ? null : await artifactCapPromise;
+    if (artifactCap && !writeDisabled) {
+      try {
+        await artifactCap.publish(buildFullDocument({ profiles }));
+        // Success reloads every open view (this one included) to the new
+        // version - there is nothing further to do here.
+        pendingSync = false;
+        return { ok: true };
+      } catch (err) {
+        const code = err && err.code;
+        if (code === "not_writer" || code === "not_granted") {
+          writeDisabled = true;
+          setMessage("You're viewing read-only - ask to be made an editor to save progress.");
+        } else if (code !== "conflict") {
+          pendingSync = true;
+        }
+        // conflict: the shell is already reloading to the winning version.
+        // Anything else: transient failure. Either way, keep a local copy
+        // so this device doesn't lose the result even if it can't share it.
+        saveList(STORE_PROFILES_FALLBACK, profiles);
+        return { ok: false, code };
+      }
+    }
+    pendingSync = true;
+    saveList(STORE_PROFILES_FALLBACK, profiles);
+    return { ok: false, code: "no-capability" };
+  }
+
+  // Play works fully offline already (everything above falls back to this
+  // device's own storage); this just means a result doesn't stay stranded
+  // here once the connection comes back.
+  window.addEventListener("online", () => {
+    if (pendingSync && !writeDisabled) saveProfiles(state.profiles);
+  });
+
+  // Applies a level result to the in-memory roster (synchronous - does NOT
+  // persist). Returns { starsChanged, justUnlocked } for the calling UI.
+  // Persistence is a separate, deliberately un-awaited step (see endRound):
+  // a successful publish can reload the page, so the modal that reports
+  // the result must already be showing before that happens, not waiting
+  // on it - per the artifact capability's own "publish is the last act of
+  // an interaction" guidance.
+  function applyLevelResult(profile, level, won, stars) {
+    const stored = state.profiles.find((p) => p.id === profile.id);
+    if (!stored) return { starsChanged: false, justUnlocked: false };
+
+    stored.levelStars = stored.levelStars || {};
+    const previousStars = stored.levelStars[level] || 0;
+    let starsChanged = false;
+    if (won && stars > previousStars) {
+      stored.levelStars[level] = stars;
+      starsChanged = true;
+    }
+    let justUnlocked = false;
+    if (won && stored.highestLevelUnlocked <= level) {
+      stored.highestLevelUnlocked = level + 1;
+      justUnlocked = true;
+    }
+    profile.levelStars = stored.levelStars;
+    profile.highestLevelUnlocked = stored.highestLevelUnlocked;
+    return { starsChanged, justUnlocked };
+  }
+
+  // ---------------------------------------------------------------------
+  // Sound: tiny synthesized effects (no audio files) via Web Audio, so
+  // there's real audio feedback without any assets to load or host.
+  // Muted state is a per-device preference (not shared game progress),
+  // so it lives in localStorage rather than the shared profile roster.
+  // The AudioContext is created lazily on first use, from inside a real
+  // user-gesture handler (a board swap, a button click) - browsers block
+  // audio started any other way.
+  // ---------------------------------------------------------------------
+  const SOUND_MUTE_KEY = "gumdropCascade.muted";
+  const sound = (() => {
+    let ctx = null;
+    let muted = false;
+    try { muted = localStorage.getItem(SOUND_MUTE_KEY) === "1"; } catch { /* ignore */ }
+
+    function ensureCtx() {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      if (!ctx) ctx = new AC();
+      if (ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+
+    // One short tone with a click-free envelope, optionally sliding pitch.
+    function tone({ freq, dur = 0.12, type = "sine", gain = 0.16, delay = 0, slideTo = null }) {
+      if (muted) return;
+      const c = ensureCtx();
+      if (!c) return;
+      const t0 = c.currentTime + delay;
+      const osc = c.createOscillator();
+      const g = c.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0);
+      if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(gain, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g).connect(c.destination);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
+    }
+
+    const NOTE = { A4: 440, C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, C6: 1046.5 };
+
+    return {
+      get muted() { return muted; },
+      toggle() {
+        muted = !muted;
+        try { localStorage.setItem(SOUND_MUTE_KEY, muted ? "1" : "0"); } catch { /* ignore */ }
+        return muted;
+      },
+      swap() { tone({ freq: 340, dur: 0.06, type: "triangle", gain: 0.1 }); },
+      invalid() { tone({ freq: 160, dur: 0.14, type: "sawtooth", gain: 0.08, slideTo: 110 }); },
+      // Pitch rises a little with cascade depth so a chain feels like it's
+      // building; `big` (a large or special-combo clear) adds a second,
+      // fuller layer underneath.
+      pop(depth, big) {
+        const base = big ? NOTE.G5 : NOTE.C5;
+        const step = Math.min(depth - 1, 5);
+        tone({ freq: base * Math.pow(2, step / 12), dur: big ? 0.22 : 0.1, type: "square", gain: big ? 0.16 : 0.11 });
+        if (big) tone({ freq: base * 1.5, dur: 0.25, type: "square", gain: 0.1, delay: 0.03 });
+      },
+      specialCreate() {
+        tone({ freq: NOTE.C5, dur: 0.1, type: "sine", gain: 0.14 });
+        tone({ freq: NOTE.E5, dur: 0.12, type: "sine", gain: 0.14, delay: 0.06 });
+        tone({ freq: NOTE.C6, dur: 0.16, type: "sine", gain: 0.14, delay: 0.12 });
+      },
+      win() {
+        [NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6].forEach((f, i) => tone({ freq: f, dur: 0.22, type: "triangle", gain: 0.15, delay: i * 0.1 }));
+      },
+      lose() { tone({ freq: NOTE.A4, dur: 0.4, type: "sine", gain: 0.12, slideTo: 220 }); },
+      shuffle() {
+        [300, 420, 300].forEach((freq, i) => tone({ freq, dur: 0.08, type: "triangle", gain: 0.1, delay: i * 0.08 }));
+      },
+    };
+  })();
+
+  // ---------------------------------------------------------------------
+  // Game logic (ported 1:1 from the original terminal prototype)
+  // ---------------------------------------------------------------------
+  function randomCandy() {
+    return { type: CANDY_TYPES[Math.floor(Math.random() * CANDY_TYPES.length)], special: null };
+  }
+
+  function findMatchRuns(board) {
+    const runs = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      let start = 0;
+      for (let c = 1; c <= BOARD_SIZE; c++) {
+        const same = c < BOARD_SIZE && board[r][c] && board[r][start] && board[r][c].type === board[r][start].type;
+        if (!same) {
+          if (c - start >= 3) {
+            const cells = [];
+            for (let cc = start; cc < c; cc++) cells.push([r, cc]);
+            runs.push({ cells, dir: "row" });
+          }
+          start = c;
+        }
+      }
+    }
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      let start = 0;
+      for (let r = 1; r <= BOARD_SIZE; r++) {
+        const same = r < BOARD_SIZE && board[r][c] && board[start][c] && board[r][c].type === board[start][c].type;
+        if (!same) {
+          if (r - start >= 3) {
+            const cells = [];
+            for (let rr = start; rr < r; rr++) cells.push([rr, c]);
+            runs.push({ cells, dir: "col" });
+          }
+          start = r;
+        }
+      }
+    }
+    return runs;
+  }
+
+  // Generates a board with no matches already on it, AND at least one legal
+  // move available (regenerating from scratch on the rare unplayable roll -
+  // astronomically unlikely on an 8x8 board with 5 types, but a silently
+  // stuck board would be a much worse bug than one extra generation pass).
+  function createBoard() {
+    let board;
+    let deadlockGuard = 0;
+    do {
+      board = Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, randomCandy));
+      let guard = 0;
+      while (findMatchRuns(board).length && guard++ < 200) {
+        for (const run of findMatchRuns(board)) {
+          for (const [r, c] of run.cells) board[r][c] = randomCandy();
+        }
+      }
+    } while (!findHint(board) && deadlockGuard++ < 20);
+    return board;
+  }
+
+  function isAdjacent([r1, c1], [r2, c2]) {
+    return Math.abs(r1 - r2) + Math.abs(c1 - c2) === 1;
+  }
+
+  function swapCells(board, [r1, c1], [r2, c2]) {
+    const tmp = board[r1][c1];
+    board[r1][c1] = board[r2][c2];
+    board[r2][c2] = tmp;
+  }
+
+  const keyOf = ([r, c]) => `${r},${c}`;
+
+  // Finds one adjacent swap that's actually legal to make right now - either
+  // it creates a match, or (since a special-swap combo needs no match) both
+  // candies are specials. Returns null when the board is genuinely stuck.
+  // Used both for the idle hint and to decide whether to auto-reshuffle.
+  function findHint(board) {
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        for (const [dr, dc] of [[0, 1], [1, 0]]) {
+          const r2 = r + dr, c2 = c + dc;
+          if (r2 >= BOARD_SIZE || c2 >= BOARD_SIZE) continue;
+          const a = board[r][c], b = board[r2][c2];
+          if (a && b && a.special && b.special) return [[r, c], [r2, c2]];
+          swapCells(board, [r, c], [r2, c2]);
+          const hasMatch = findMatchRuns(board).length > 0;
+          swapCells(board, [r, c], [r2, c2]); // revert - this is a probe, not a real move
+          if (hasMatch) return [[r, c], [r2, c2]];
+        }
+      }
+    }
+    return null;
+  }
+
+  function refillBoard(board) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const column = [];
+      for (let r = 0; r < BOARD_SIZE; r++) if (board[r][c]) column.push(board[r][c]);
+      const missing = BOARD_SIZE - column.length;
+      const fresh = Array.from({ length: missing }, randomCandy);
+      const newColumn = fresh.concat(column);
+      for (let r = 0; r < BOARD_SIZE; r++) board[r][c] = newColumn[r];
+    }
+  }
+
+  // Async generator: yields animation "beats" exactly like the terminal build's
+  // resolve_board_steps, so the whole cascade plays out visibly. Each "flash"
+  // step carries `delta` (points this clear is about to add) and
+  // `specialsCreated` up front, before the board mutates, so the caller can
+  // drive a score popup / sound / combo text right at the moment of impact.
+  async function* resolveBoardSteps(board, score, swappedPos) {
+    let matchedAny = false;
+
+    while (true) {
+      const runs = findMatchRuns(board);
+      if (!runs.length) break;
+      matchedAny = true;
+
+      const clearSet = new Map(); // key -> [r,c]
+      const newSpecials = new Map(); // key -> special type
+
+      for (const run of runs) {
+        const { cells, dir } = run;
+        if (cells.length >= 4) {
+          const swappedInRun = swappedPos && cells.some((p) => p[0] === swappedPos[0] && p[1] === swappedPos[1]);
+          const anchor = swappedInRun ? swappedPos : cells[Math.floor(cells.length / 2)];
+          newSpecials.set(keyOf(anchor), cells.length >= 5 ? "color" : dir);
+          for (const p of cells) {
+            if (p[0] !== anchor[0] || p[1] !== anchor[1]) clearSet.set(keyOf(p), p);
+          }
+        } else {
+          for (const p of cells) clearSet.set(keyOf(p), p);
+        }
+      }
+
+      // trigger power candies caught in the blast
+      let frontier = new Set(clearSet.keys());
+      const seen = new Set();
+      while (frontier.size) {
+        const next = new Set();
+        for (const k of frontier) {
+          if (seen.has(k)) continue;
+          seen.add(k);
+          const [r, c] = k.split(",").map(Number);
+          const cell = board[r][c];
+          if (!cell) continue;
+          if (cell.special === "row") {
+            for (let cc = 0; cc < BOARD_SIZE; cc++) {
+              const kk = keyOf([r, cc]);
+              if (!clearSet.has(kk)) { clearSet.set(kk, [r, cc]); next.add(kk); }
+            }
+          } else if (cell.special === "col") {
+            for (let rr = 0; rr < BOARD_SIZE; rr++) {
+              const kk = keyOf([rr, c]);
+              if (!clearSet.has(kk)) { clearSet.set(kk, [rr, c]); next.add(kk); }
+            }
+          } else if (cell.special === "color") {
+            const type = cell.type;
+            for (let rr = 0; rr < BOARD_SIZE; rr++) {
+              for (let cc = 0; cc < BOARD_SIZE; cc++) {
+                const kk = keyOf([rr, cc]);
+                if (!clearSet.has(kk) && board[rr][cc] && board[rr][cc].type === type) {
+                  clearSet.set(kk, [rr, cc]);
+                  next.add(kk);
+                }
+              }
+            }
+          }
+        }
+        frontier = next;
+      }
+
+      for (const k of newSpecials.keys()) clearSet.delete(k);
+
+      const delta = clearSet.size * 10 + newSpecials.size * 50;
+      yield { kind: "flash", positions: [...clearSet.values()], score, delta, specialsCreated: newSpecials.size };
+      score += delta;
+
+      for (const [r, c] of clearSet.values()) board[r][c] = null;
+      for (const [k, special] of newSpecials) {
+        const [r, c] = k.split(",").map(Number);
+        if (board[r][c]) board[r][c].special = special;
+      }
+
+      yield { kind: "popped", score };
+
+      refillBoard(board);
+
+      yield { kind: "refilled", score, freshCols: true };
+
+      swappedPos = null;
+    }
+
+    yield { kind: "done", matchedAny, score };
+  }
+
+  // Which cells a combo of two specials, swapped directly into each other
+  // (rather than caught in a match), blows up - the single most satisfying
+  // move in the genre, and previously missing: swapping two specials with
+  // no new match just reverted like any other invalid move.
+  function comboClearPositions(a, b, specialA, specialB) {
+    const positions = new Map(); // key -> [r,c]
+    const addRow = (r) => { for (let c = 0; c < BOARD_SIZE; c++) positions.set(keyOf([r, c]), [r, c]); };
+    const addCol = (c) => { for (let r = 0; r < BOARD_SIZE; r++) positions.set(keyOf([r, c]), [r, c]); };
+    const addAll = () => { for (let r = 0; r < BOARD_SIZE; r++) for (let c = 0; c < BOARD_SIZE; c++) positions.set(keyOf([r, c]), [r, c]); };
+
+    if (specialA === "color" && specialB === "color") {
+      addAll(); // the biggest possible moment: clear the whole board
+    } else if (specialA === "color" || specialB === "color") {
+      // color bomb + a stripe: three lines of that orientation, spread
+      // across the board, plus the stripe's own line.
+      const stripePos = specialA === "color" ? b : a;
+      const stripeDir = specialA === "color" ? specialB : specialA;
+      const lines = stripeDir === "row" ? [1, 4, 6, stripePos[0]] : [1, 4, 6, stripePos[1]];
+      lines.forEach(stripeDir === "row" ? addRow : addCol);
+    } else {
+      // stripe + stripe (row+row, col+col, or row+col): each contributes
+      // its own line through its own position - a plain "+" for a mixed
+      // pair, a double line for a matching pair.
+      if (specialA === "row") addRow(a[0]); else addCol(a[1]);
+      if (specialB === "row") addRow(b[0]); else addCol(b[1]);
+    }
+    return [...positions.values()];
+  }
+
+  // Mirrors resolveBoardSteps' flash/pop/refill beats for a combo blast,
+  // then hands off to the normal generator so any matches the refill
+  // creates keep cascading exactly like a regular move would.
+  async function* resolveComboSteps(board, score, a, b) {
+    const specialA = board[a[0]][a[1]].special;
+    const specialB = board[b[0]][b[1]].special;
+    const positions = comboClearPositions(a, b, specialA, specialB);
+    const delta = positions.length * 10 + 250; // flat bonus on top, for the combo itself
+
+    yield { kind: "flash", positions, score, delta, combo: true };
+    score += delta;
+
+    for (const [r, c] of positions) board[r][c] = null;
+
+    yield { kind: "popped", score };
+
+    refillBoard(board);
+
+    yield { kind: "refilled", score, freshCols: true };
+
+    yield* resolveBoardSteps(board, score, null);
+  }
+
+  // ---------------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------------
+  const SHAPE_SVG = {
+    circle: (fill) => `<circle cx="50" cy="50" r="46" fill="${fill}"/>`,
+    square: (fill) => `<rect x="6" y="6" width="88" height="88" rx="20" fill="${fill}"/>`,
+    triangle: (fill) => `<polygon points="50,6 94,90 6,90" fill="${fill}" stroke="${fill}" stroke-width="12" stroke-linejoin="round"/>`,
+    diamond: (fill) => `<polygon points="50,4 96,50 50,96 4,50" fill="${fill}" stroke="${fill}" stroke-width="6" stroke-linejoin="round"/>`,
+    cross: (fill) => `<path d="M35 4h30v31h31v30h-31v31h-30v-31h-31v-30h31z" fill="${fill}" stroke="${fill}" stroke-width="8" stroke-linejoin="round"/>`,
+  };
+  const CANDY_COLOR_VAR = { circle: "circle", square: "square", triangle: "triangle", diamond: "diamond", cross: "cross" };
+
+  function shapeSVG(type) {
+    const varName = CANDY_COLOR_VAR[type];
+    const fill = `var(--c-${varName})`;
+    const dark = `var(--c-${varName}-d)`;
+    const gloss = `M20 30 a34 22 0 0 1 55 -8 a30 18 0 0 0 -55 8 z`;
+    return `<svg class="shape" viewBox="0 0 100 100">
+      <defs><clipPath id="clip-${type}">${SHAPE_SVG[type]("white")}</clipPath></defs>
+      ${SHAPE_SVG[type](fill)}
+      <g clip-path="url(#clip-${type})">
+        <rect x="0" y="55" width="100" height="45" fill="${dark}" opacity="0.35"/>
+        <ellipse cx="34" cy="28" rx="24" ry="14" fill="white" opacity="0.55"/>
+      </g>
+    </svg>`;
+  }
+  // shapeSVG(type)'s output never varies for a given type (fill/dark are
+  // always the same CSS var() reference, not a resolved color) - precompute
+  // it once instead of rebuilding the same markup string on every single
+  // cell, on every single render, which is real CPU cost during a fast
+  // cascade on a slower mobile CPU.
+  const SHAPE_HTML = Object.fromEntries(CANDY_TYPES.map((t) => [t, shapeSVG(t)]));
+
+  const state = {
+    profiles: [], // the shared roster - loaded at boot, kept in memory, republished on change
+    board: null,
+    cursor: [0, 0],
+    selected: null,
+    score: 0,
+    movesLeft: 0,
+    movesTotal: 0,
+    target: 0,
+    level: 1,
+    busy: false,
+    profile: null,
+    pendingName: "",
+    pendingGem: null,
+  };
+
+  const el = {
+    board: document.getElementById("board"),
+    score: document.getElementById("stat-score"),
+    moves: document.getElementById("stat-moves"),
+    target: document.getElementById("stat-target"),
+    message: document.getElementById("message"),
+    playerChip: document.getElementById("player-chip"),
+    playerAvatar: document.getElementById("player-avatar"),
+    playerName: document.getElementById("player-name"),
+    level: document.getElementById("stat-level"),
+  };
+
+  function setMessage(text) { el.message.textContent = text; }
+  function starsHTML(count, size) {
+    const cls = size || "";
+    let html = "";
+    for (let i = 0; i < 3; i++) html += `<span class="${i < count ? "lit" : "dim"}">\u2605</span>`;
+    return html;
+  }
+
+  // ---------------------------------------------------------------------
+  // Gem companion: a faceted crystal IS the avatar. Its color is a reward
+  // you pick, unlocked with total stars earned (the same currency levels
+  // already award); its CUT - facet count, glow, sparkle - grows on its
+  // own as you earn more stars. Levelling up literally changes how it
+  // looks, with no separate wardrobe of parts to draw or equip.
+  // ---------------------------------------------------------------------
+  function shade(hex, amt) {
+    // amt in [-1, 1]: negative mixes toward black, positive toward white.
+    // Used to fake per-facet lighting from a single base color.
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const target = amt < 0 ? 0 : 255;
+    const p = Math.min(1, Math.abs(amt));
+    r = Math.round(r + (target - r) * p);
+    g = Math.round(g + (target - g) * p);
+    b = Math.round(b + (target - b) * p);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  const GEM_PALETTE = [
+    { id: "quartz", hex: "#c6d2e0", label: "Quartz", unlockStars: 0 },
+    { id: "citrine", hex: "#f2b93d", label: "Citrine", unlockStars: 0 },
+    { id: "aqua", hex: "#4fc7c9", label: "Aquamarine", unlockStars: 0 },
+    { id: "emerald", hex: "#33ad6b", label: "Emerald", unlockStars: 6 },
+    { id: "sapphire", hex: "#3f6fd1", label: "Sapphire", unlockStars: 12 },
+    { id: "amethyst", hex: "#9a5fd6", label: "Amethyst", unlockStars: 18 },
+    { id: "ruby", hex: "#d63b5c", label: "Ruby", unlockStars: 24 },
+    { id: "rose", hex: "#ef8fb0", label: "Rose Quartz", unlockStars: 28 },
+    { id: "onyx", hex: "#4a4460", label: "Onyx", unlockStars: 32 },
+    { id: "prism", hex: "#ffffff", label: "Prism", unlockStars: 40, prism: true },
+  ];
+  function gemColor(id) {
+    return GEM_PALETTE.find((g) => g.id === id) || GEM_PALETTE[0];
+  }
+  // Migration only (see migrateProfile): old avatars had a "body" color
+  // instead of a gem. Carry a rough sense of "their color" forward rather
+  // than resetting everyone to the same default.
+  const OLD_BODY_COLOR_TO_GEM = {
+    tan: "citrine", orange: "citrine", brown: "citrine", grey: "quartz",
+    cream: "quartz", green: "emerald", blue: "sapphire", purple: "amethyst",
+    pink: "rose", red: "ruby",
+  };
+
+  // Visual growth tiers, driven purely by totalStars(profile) - no separate
+  // storage needed, so a gem always reflects real, current progress.
+  const GEM_TIERS = [
+    { min: 0, name: "Shard", facets: 0, glow: 0, sparkles: 0 },
+    { min: 5, name: "Cut", facets: 5, glow: 0.3, sparkles: 0 },
+    { min: 15, name: "Polished", facets: 5, glow: 0.55, sparkles: 2 },
+    { min: 30, name: "Radiant", facets: 10, glow: 0.75, sparkles: 4 },
+    { min: 50, name: "Mythic", facets: 10, glow: 1, sparkles: 5, orbit: true, aura: true },
+  ];
+  function gemTierFor(stars) {
+    let t = GEM_TIERS[0];
+    for (const tier of GEM_TIERS) if (stars >= tier.min) t = tier;
+    return t;
+  }
+
+  // Shared cut geometry: a classic five-point gem silhouette (flat table,
+  // two shoulders, pointed base) in a 0-100 square viewBox.
+  const GEM_OUTLINE = [[38, 18], [62, 18], [82, 38], [50, 90], [18, 38]];
+  const GEM_CENTROID = [50, 40.4];
+  function scalePoints(pts, center, f) {
+    return pts.map(([x, y]) => [center[0] + (x - center[0]) * f, center[1] + (y - center[1]) * f]);
+  }
+  const RAINBOW = ["#ff5fac", "#ff8f5c", "#ffd23f", "#9be564", "#4fd6c0", "#4c8cf0", "#7a6bf0", "#b36bf0", "#ef5364", "#ffffff"];
+
+  // Fans facets out from a center point so each one catches a different
+  // amount of "light" (cosine falloff from a fixed light angle) - the same
+  // trick flat-design gem icons use, just computed instead of hand-tuned.
+  function facetPolygons(baseHex, facetCount, prism) {
+    let pts = GEM_OUTLINE;
+    let center = [50, 47];
+    if (facetCount >= 10) {
+      const mids = GEM_OUTLINE.map(([x, y], i) => {
+        const [qx, qy] = GEM_OUTLINE[(i + 1) % GEM_OUTLINE.length];
+        return [(x + qx) / 2, (y + qy) / 2];
+      });
+      pts = [];
+      GEM_OUTLINE.forEach((p, i) => { pts.push(p); pts.push(mids[i]); });
+      center = [50, 44];
+    }
+    const lightAngle = -2.1;
+    let s = "";
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      const midAngle = Math.atan2((a[1] + b[1]) / 2 - center[1], (a[0] + b[0]) / 2 - center[0]);
+      const amt = Math.max(-0.4, Math.min(0.42, Math.cos(midAngle - lightAngle) * 0.42));
+      const fill = prism ? RAINBOW[i % RAINBOW.length] : shade(baseHex, amt);
+      s += `<polygon points="${center.join(",")} ${a.join(",")} ${b.join(",")}" fill="${fill}"/>`;
+    }
+    s += `<polygon points="${GEM_OUTLINE.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${shade(baseHex, -0.45)}" stroke-width="1.6" stroke-linejoin="round"/>`;
+    return s;
+  }
+
+  function gemGlow(strength, baseHex) {
+    if (strength <= 0) return "";
+    return `<circle cx="50" cy="48" r="42" fill="${baseHex}" opacity="${(0.2 * strength).toFixed(2)}" filter="url(#gem-blur)"/>`;
+  }
+  function sparkleGlyph(cx, cy, r, delay) {
+    const pts = [
+      [cx, cy - r], [cx + r * 0.28, cy - r * 0.28], [cx + r, cy], [cx + r * 0.28, cy + r * 0.28],
+      [cx, cy + r], [cx - r * 0.28, cy + r * 0.28], [cx - r, cy], [cx - r * 0.28, cy - r * 0.28],
+    ];
+    return `<polygon class="gem-sparkle" style="animation-delay:${delay}s" points="${pts.map((p) => p.join(",")).join(" ")}" fill="white"/>`;
+  }
+  const SPARKLE_POINTS = [[22, 24], [80, 30], [16, 62], [86, 66], [50, 8]];
+  const ORBIT_POINTS = [[50, -4], [93, 70], [7, 70]]; // rotated as a group about (50,48)
+
+  function auraRing() {
+    return `<circle class="gem-aura" cx="50" cy="48" r="46" fill="none" stroke="white" stroke-width="2" stroke-dasharray="5 6" opacity="0.65"/>`;
+  }
+
+  function gemSVG(avatar, stars) {
+    const color = gemColor(avatar.color);
+    const tier = gemTierFor(stars);
+    const baseHex = color.hex;
+    let body;
+    if (tier.facets === 0) {
+      // Rough, uncut shard: smaller and duller than a finished cut.
+      const rough = scalePoints(GEM_OUTLINE, GEM_CENTROID, 0.72);
+      body = `<polygon points="${rough.map((p) => p.join(",")).join(" ")}" fill="${shade(baseHex, -0.12)}" stroke="${shade(baseHex, -0.4)}" stroke-width="1.4" stroke-linejoin="round" opacity="0.92"/>`;
+    } else {
+      body = facetPolygons(baseHex, tier.facets, color.prism);
+    }
+    const glow = gemGlow(tier.glow, baseHex);
+    const aura = tier.aura ? auraRing() : "";
+    const sparkles = SPARKLE_POINTS.slice(0, tier.sparkles).map((p, i) => sparkleGlyph(p[0], p[1], 4.5 + (i % 2) * 1.5, i * 0.3)).join("");
+    const orbit = tier.orbit
+      ? `<g class="gem-orbit">${ORBIT_POINTS.map((p) => sparkleGlyph(p[0], p[1], 4, 0)).join("")}</g>`
+      : "";
+    return `${glow}${aura}${body}${sparkles}${orbit}`;
+  }
+
+  function normalizeAvatar(avatar) {
+    if (avatar && typeof avatar === "object" && typeof avatar.color === "string" && GEM_PALETTE.some((g) => g.id === avatar.color)) {
+      return { color: avatar.color };
+    }
+    return { color: GEM_PALETTE[0].id };
+  }
+
+  // `full: true` draws the larger customize-screen preview; the default
+  // (small) is used everywhere space is tight: profile lists, leaderboard,
+  // the in-game player chip. `stars` (total stars earned) drives the
+  // gem's growth tier - pass 0 for a plain, undressed color swatch.
+  function avatarHTML(avatar, opts) {
+    const full = !!(opts && opts.full);
+    const stars = (opts && typeof opts.stars === "number") ? opts.stars : 0;
+    const a = normalizeAvatar(avatar);
+    const cls = full ? "full" : "small";
+    const live = gemTierFor(stars).facets > 0 ? " gem-live" : "";
+    return `<span class="avatar-stack ${cls}"><svg class="avatar-svg gem-svg${live}" viewBox="0 0 100 100" aria-hidden="true">${gemSVG(a, stars)}</svg></span>`;
+  }
+
+  function renderBoard(opts = {}) {
+    const { flashSet = null, dropCols = null } = opts;
+    el.board.innerHTML = "";
+    const hintSet = hintCells ? new Set(hintCells.map(keyOf)) : null;
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        const cellEl = document.createElement("div");
+        cellEl.className = "cell";
+        cellEl.dataset.r = r;
+        cellEl.dataset.c = c;
+        if (state.cursor[0] === r && state.cursor[1] === c) cellEl.classList.add("cursor");
+        if (state.selected && state.selected[0] === r && state.selected[1] === c) cellEl.classList.add("selected");
+
+        const cell = state.board[r][c];
+        if (cell) {
+          const candyEl = document.createElement("div");
+          candyEl.className = "candy";
+          candyEl.innerHTML = SHAPE_HTML[cell.type];
+          if (cell.special) {
+            const ring = document.createElement("div");
+            ring.className = "power-ring " + (cell.special === "color" ? "bomb" : cell.special);
+            candyEl.appendChild(ring);
+          }
+          if (flashSet && flashSet.has(keyOf([r, c]))) candyEl.classList.add("flash");
+          if (dropCols && dropCols.has(c)) candyEl.classList.add("dropping");
+          if (hintSet && hintSet.has(keyOf([r, c]))) candyEl.classList.add("hint");
+          cellEl.appendChild(candyEl);
+        }
+        el.board.appendChild(cellEl);
+      }
+    }
+  }
+
+  function renderHUD() {
+    el.score.textContent = state.score;
+    el.moves.textContent = state.movesLeft;
+    el.target.textContent = state.target;
+    el.level.textContent = state.level;
+  }
+
+  function sleep(ms) { return new Promise((res) => setTimeout(res, ms)); }
+  // Waits for an actual paint of whatever was just rendered before moving
+  // on. A `renderBoard()` call followed straight by `sleep(ms)` relies on
+  // the browser painting somewhere in that window - fine on desktop, but
+  // some mobile/embedded WebViews can coalesce several rapid DOM rebuilds
+  // into a single paint and only ever show the LAST one, so a fast cascade
+  // plays every sound on schedule but only its final frame is ever seen.
+  // Two rAFs (one for "next paint is scheduled", one for "it happened")
+  // forces a real commit in between.
+  function nextFrame() {
+    return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }
+
+  // Escalating callout as a single move chains into more cascades - depth 1
+  // is the first clear, depth 2+ is gravity setting up another match on its
+  // own. `special` picks a distinct opener for a combo-swap blast.
+  const COMBO_MESSAGES = ["Sweet!", "Tasty!", "Delicious!", "Amazing!", "SUGAR RUSH!"];
+  function setComboMessage(depth, special) {
+    setMessage(special ? "BOOM! \u{1F4A5}" : COMBO_MESSAGES[Math.min(depth - 1, COMBO_MESSAGES.length - 1)]);
+    el.message.classList.toggle("combo", special || depth >= 2);
+  }
+
+  // Floating "+N" where a clear just happened, anchored to the centroid of
+  // the cells involved (in board-relative percent, so it holds position
+  // regardless of board size on screen).
+  function spawnScorePopup(positions, delta) {
+    if (!delta || !positions.length) return;
+    const avgR = positions.reduce((sum, p) => sum + p[0], 0) / positions.length;
+    const avgC = positions.reduce((sum, p) => sum + p[1], 0) / positions.length;
+    const popup = document.createElement("div");
+    popup.className = "score-popup";
+    popup.textContent = "+" + delta;
+    popup.style.left = ((avgC + 0.5) / BOARD_SIZE) * 100 + "%";
+    popup.style.top = ((avgR + 0.5) / BOARD_SIZE) * 100 + "%";
+    el.board.appendChild(popup);
+    popup.addEventListener("animationend", () => popup.remove());
+  }
+
+  function shakeBoard() {
+    el.board.classList.remove("shake");
+    void el.board.offsetWidth; // force reflow so re-triggering restarts the animation
+    el.board.classList.add("shake");
+  }
+  el.board.addEventListener("animationend", (e) => {
+    if (e.animationName === "board-shake") el.board.classList.remove("shake");
+  });
+
+  // ---------------------------------------------------------------------
+  // Idle hint: gently pulse a valid move after a few seconds of no input,
+  // so a stuck 8-year-old never has to wonder what to do. Runs only while
+  // an actual round is on screen (see showOverlay/newRound).
+  // ---------------------------------------------------------------------
+  const IDLE_HINT_MS = 6000;
+  let idleTimer = null;
+  let hintCells = null;
+
+  function clearIdleHint() {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+    if (hintCells) { hintCells = null; renderBoard(); }
+  }
+  function resetIdleTimer() {
+    clearIdleHint();
+    idleTimer = setTimeout(() => {
+      if (state.busy) { resetIdleTimer(); return; } // try again once the board settles
+      hintCells = findHint(state.board);
+      if (hintCells) renderBoard();
+    }, IDLE_HINT_MS);
+  }
+
+  // ---------------------------------------------------------------------
+  // Game flow
+  // ---------------------------------------------------------------------
+  async function attemptSwap(a, b) {
+    if (state.busy) return;
+    state.busy = true;
+    swapCells(state.board, a, b);
+
+    const hasMatch = findMatchRuns(state.board).length > 0;
+    const cellA = state.board[a[0]][a[1]];
+    const cellB = state.board[b[0]][b[1]];
+    const isComboSwap = !hasMatch && cellA && cellB && cellA.special && cellB.special;
+
+    if (!hasMatch && !isComboSwap) {
+      swapCells(state.board, a, b); // undo
+      state.selected = null;
+      renderBoard();
+      setMessage("No match there - try a different spot.");
+      sound.invalid();
+      state.busy = false;
+      return;
+    }
+
+    sound.swap();
+    state.selected = null;
+    let depth = 0;
+    const steps = isComboSwap
+      ? resolveComboSteps(state.board, state.score, a, b)
+      : resolveBoardSteps(state.board, state.score, b);
+
+    for await (const step of steps) {
+      if (step.kind === "flash") {
+        depth++;
+        const big = step.combo || step.positions.length >= 8;
+        const flashSet = new Set(step.positions.map(keyOf));
+        renderBoard({ flashSet });
+        spawnScorePopup(step.positions, step.delta);
+        setComboMessage(depth, step.combo);
+        sound.pop(depth, big);
+        if (step.specialsCreated) sound.specialCreate();
+        if (big) shakeBoard();
+        await nextFrame();
+        await sleep(FLASH_MS);
+      } else if (step.kind === "popped") {
+        state.score = step.score;
+        renderHUD();
+        renderBoard();
+        await nextFrame();
+        await sleep(SETTLE_MS * 0.4);
+      } else if (step.kind === "refilled") {
+        state.score = step.score;
+        renderHUD();
+        renderBoard({ dropCols: new Set(Array.from({ length: BOARD_SIZE }, (_, i) => i)) });
+        await nextFrame();
+        await sleep(SETTLE_MS);
+      } else if (step.kind === "done") {
+        state.score = step.score;
+      }
+    }
+
+    state.movesLeft -= 1; // reaching here always means at least one flash happened above
+    renderHUD();
+    renderBoard();
+    state.busy = false;
+    await checkRoundEnd();
+  }
+
+  async function checkRoundEnd() {
+    if (state.score >= state.target) {
+      await endRound(true);
+    } else if (state.movesLeft <= 0) {
+      await endRound(false);
+    } else if (!findHint(state.board)) {
+      await reshuffleBoard();
+    }
+  }
+
+  // The board can end up with no legal move left after a cascade settles.
+  // createBoard() already avoids dealing one, so this only ever fires on a
+  // genuinely stuck refill - reshuffle in place rather than soft-locking
+  // the round.
+  async function reshuffleBoard() {
+    state.busy = true;
+    clearIdleHint();
+    setMessage("No more moves - shuffling! \u{1F500}");
+    sound.shuffle();
+    await sleep(500);
+    state.board = createBoard();
+    renderBoard();
+    state.busy = false;
+    resetIdleTimer();
+  }
+
+  async function endRound(won) {
+    state.busy = true;
+    const stars = won ? starsForResult(state.movesLeft, state.movesTotal) : 0;
+    const { starsChanged, justUnlocked } = applyLevelResult(state.profile, state.level, won, stars);
+    if (won) sound.win(); else sound.lose();
+
+    const nextBtn = document.getElementById("btn-next-level");
+    const retryBtn = document.getElementById("btn-retry-level");
+    if (won) {
+      document.getElementById("gameover-title").textContent = starsChanged ? "Level Complete! \u{1F389}" : "Level Complete!";
+      document.getElementById("gameover-sub").textContent = justUnlocked
+        ? `${state.profile.name} cleared Level ${state.level} and unlocked Level ${state.level + 1}!`
+        : `${state.profile.name} cleared Level ${state.level} again - nice!`;
+      document.getElementById("gameover-stars").innerHTML = starsHTML(stars);
+      nextBtn.hidden = false;
+      retryBtn.hidden = true;
+    } else {
+      document.getElementById("gameover-title").textContent = "Out of moves!";
+      document.getElementById("gameover-sub").textContent = `So close - ${state.score}/${state.target} points. Try Level ${state.level} again?`;
+      document.getElementById("gameover-stars").innerHTML = starsHTML(0);
+      nextBtn.hidden = true;
+      retryBtn.hidden = false;
+    }
+    showOverlay("overlay-gameover");
+
+    // Share the result in the background - deliberately not awaited: a
+    // successful publish can reload the page (see saveProfiles), and the
+    // modal above must already be visible before that happens, not
+    // waiting on it.
+    saveProfiles(state.profiles);
+  }
+
+  function newRound(levelNumber) {
+    const config = levelConfig(levelNumber);
+    state.level = levelNumber;
+    state.target = config.target;
+    state.movesTotal = config.moves;
+    state.board = createBoard();
+    state.cursor = [0, 0];
+    state.selected = null;
+    state.score = 0;
+    state.movesLeft = config.moves;
+    state.busy = false;
+    setMessage("Good luck!");
+    renderHUD();
+    renderBoard();
+    resetIdleTimer();
+  }
+
+  function moveCursor(dr, dc) {
+    if (state.busy) return;
+    resetIdleTimer();
+    const [r, c] = state.cursor;
+    state.cursor = [Math.min(BOARD_SIZE - 1, Math.max(0, r + dr)), Math.min(BOARD_SIZE - 1, Math.max(0, c + dc))];
+    renderBoard();
+  }
+
+  function activateCell(pos) {
+    if (state.busy) return;
+    resetIdleTimer();
+    if (!state.selected) {
+      state.selected = pos;
+      setMessage("Candy picked up! Move next to it and press Space (or tap it).");
+      renderBoard();
+    } else if (state.selected[0] === pos[0] && state.selected[1] === pos[1]) {
+      state.selected = null;
+      setMessage("Put the candy back down.");
+      renderBoard();
+    } else if (isAdjacent(state.selected, pos)) {
+      attemptSwap(state.selected, pos);
+    } else {
+      state.selected = pos;
+      renderBoard();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Input: keyboard
+  // ---------------------------------------------------------------------
+  window.addEventListener("keydown", (e) => {
+    if (anyOverlayOpen()) return;
+    switch (e.key) {
+      case "ArrowUp": e.preventDefault(); moveCursor(-1, 0); break;
+      case "ArrowDown": e.preventDefault(); moveCursor(1, 0); break;
+      case "ArrowLeft": e.preventDefault(); moveCursor(0, -1); break;
+      case "ArrowRight": e.preventDefault(); moveCursor(0, 1); break;
+      case " ": case "Enter": e.preventDefault(); activateCell(state.cursor); break;
+      case "q": case "Q": quitToLevels(); break;
+    }
+  });
+
+  function quitToLevels() {
+    if (state.busy) return; // don't interrupt a match animation mid-flight
+    showLevelSelect();
+  }
+  document.getElementById("btn-quit-round").addEventListener("click", quitToLevels);
+
+  const soundBtn = document.getElementById("btn-sound-toggle");
+  function updateSoundBtn() {
+    soundBtn.textContent = sound.muted ? "\u{1F507}" : "\u{1F50A}";
+    soundBtn.setAttribute("aria-pressed", String(sound.muted));
+  }
+  soundBtn.addEventListener("click", () => {
+    const isMuted = sound.toggle();
+    updateSoundBtn();
+    if (!isMuted) sound.pop(1, false); // quick confirmation blip when turning sound back on
+  });
+  updateSoundBtn();
+
+  // ---------------------------------------------------------------------
+  // Input: click + drag (mouse and touch via Pointer Events)
+  // ---------------------------------------------------------------------
+  let dragStart = null;
+  el.board.addEventListener("pointerdown", (e) => {
+    const cellEl = e.target.closest(".cell");
+    if (!cellEl || state.busy) return;
+    resetIdleTimer();
+    const pos = [Number(cellEl.dataset.r), Number(cellEl.dataset.c)];
+    state.cursor = pos;
+    dragStart = { pos, x: e.clientX, y: e.clientY };
+    // Capture the pointer so a finger dragged off the board (a very normal
+    // slip on a small phone screen) still delivers its pointerup here,
+    // instead of stranding dragStart forever.
+    el.board.setPointerCapture(e.pointerId);
+  });
+  el.board.addEventListener("pointerup", (e) => {
+    if (!dragStart) return;
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    const threshold = 18;
+    let target = null;
+    if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+      const [r, c] = dragStart.pos;
+      if (Math.abs(dx) > Math.abs(dy)) target = [r, c + (dx > 0 ? 1 : -1)];
+      else target = [r + (dy > 0 ? 1 : -1), c];
+      if (target[0] < 0 || target[0] >= BOARD_SIZE || target[1] < 0 || target[1] >= BOARD_SIZE) target = null;
+    }
+    if (target) {
+      state.selected = dragStart.pos;
+      attemptSwap(dragStart.pos, target);
+    } else {
+      activateCell(dragStart.pos);
+    }
+    dragStart = null;
+  });
+  el.board.addEventListener("pointercancel", () => { dragStart = null; });
+
+  // ---------------------------------------------------------------------
+  // Profiles / leaderboard UI
+  // ---------------------------------------------------------------------
+  const overlays = ["overlay-profiles", "overlay-name", "overlay-avatar", "overlay-levels", "overlay-customize", "overlay-leaderboard", "overlay-gameover"];
+  function showOverlay(id) {
+    for (const o of overlays) document.getElementById(o).hidden = o !== id;
+    if (id) clearIdleHint(); // the board isn't what's on screen right now
+  }
+  function anyOverlayOpen() {
+    return overlays.some((o) => !document.getElementById(o).hidden);
+  }
+
+  function migrateProfile(p) {
+    let changed = false;
+    if (!p.id) { p.id = makeProfileId(); changed = true; }
+    if (typeof p.highestLevelUnlocked !== "number") { p.highestLevelUnlocked = 1; changed = true; }
+    if (typeof p.levelStars !== "object" || p.levelStars === null) { p.levelStars = {}; changed = true; }
+    // Old avatars were an illustrated animal (string, or { base, accessories,
+    // colors }); the new avatar is just a gem color choice: { color }.
+    // Carry the old body color forward as a starting gem so a returning
+    // player's "color" isn't reset to the same default as everyone else.
+    if (!p.avatar || typeof p.avatar !== "object" || typeof p.avatar.color !== "string" || !GEM_PALETTE.some((g) => g.id === p.avatar.color)) {
+      const oldBodyColor = p.avatar && typeof p.avatar === "object" && p.avatar.colors ? p.avatar.colors.body : null;
+      p.avatar = { color: OLD_BODY_COLOR_TO_GEM[oldBodyColor] || "quartz" };
+      changed = true;
+    }
+    delete p.best; // superseded by levelStars/highestLevelUnlocked
+    return changed;
+  }
+
+  let confirmDeleteId = null; // profile id currently showing its "are you sure?" state
+
+  function renderProfilePicker() {
+    const list = document.getElementById("profile-list");
+    list.innerHTML = "";
+    for (const p of state.profiles) {
+      const row = document.createElement("div");
+      row.className = "profile-row-wrap";
+
+      if (confirmDeleteId === p.id) {
+        row.innerHTML = `<span class="confirm-text">Delete ${escapeHTML(p.name)}?</span>`;
+        const yesBtn = document.createElement("button");
+        yesBtn.className = "confirm-yes";
+        yesBtn.textContent = "Delete";
+        yesBtn.addEventListener("click", async () => {
+          const wasMe = state.profile && state.profile.id === p.id;
+          state.profiles = state.profiles.filter((x) => x.id !== p.id);
+          confirmDeleteId = null;
+          if (wasMe) { state.profile = null; try { localStorage.removeItem(STORE_MY_PROFILE_ID); } catch { /* ignore */ } }
+          renderProfilePicker();
+          await saveProfiles(state.profiles);
+        });
+        const noBtn = document.createElement("button");
+        noBtn.className = "confirm-no";
+        noBtn.textContent = "Cancel";
+        noBtn.addEventListener("click", () => { confirmDeleteId = null; renderProfilePicker(); });
+        row.appendChild(yesBtn);
+        row.appendChild(noBtn);
+      } else {
+        const btn = document.createElement("button");
+        btn.className = "profile-row";
+        btn.innerHTML = `${avatarHTML(p.avatar, { stars: totalStars(p) })}<span>${escapeHTML(p.name)}</span>`;
+        btn.addEventListener("click", () => choosePlayer(p));
+        const delBtn = document.createElement("button");
+        delBtn.className = "delete-profile";
+        delBtn.textContent = "\u{1F5D1}\u{FE0F}";
+        delBtn.title = `Delete ${p.name}`;
+        delBtn.setAttribute("aria-label", `Delete ${p.name}`);
+        delBtn.addEventListener("click", (e) => { e.stopPropagation(); confirmDeleteId = p.id; renderProfilePicker(); });
+        row.appendChild(btn);
+        row.appendChild(delBtn);
+      }
+      list.appendChild(row);
+    }
+  }
+  function escapeHTML(s) { return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
+
+  function choosePlayer(profile) {
+    state.profile = profile;
+    try { localStorage.setItem(STORE_MY_PROFILE_ID, profile.id); } catch { /* ignore */ }
+    el.playerChip.hidden = false;
+    el.playerAvatar.innerHTML = avatarHTML(profile.avatar, { stars: totalStars(profile) });
+    el.playerName.textContent = profile.name;
+    showLevelSelect();
+  }
+
+  // A level node's horizontal position follows a sine wave down the map, so
+  // the path snakes left-right instead of running in a straight column.
+  const LEVEL_NODE_SPACING_Y = 92;
+  const LEVEL_NODE_TOP_PAD = 40;
+  function levelNodeX(i) { return 50 + 30 * Math.sin(i * 0.85); }
+  function levelNodeY(i) { return LEVEL_NODE_TOP_PAD + i * LEVEL_NODE_SPACING_Y; }
+
+  function showLevelSelect() {
+    const profile = state.profile;
+    const map = document.getElementById("level-list");
+
+    const highest = profile.highestLevelUnlocked || 1;
+    const stars = totalStars(profile);
+    document.getElementById("levels-sub").textContent = stars
+      ? `${profile.name} - ${stars} \u2605 collected`
+      : `${profile.name} - pick a level!`;
+
+    // Newest first: the locked teaser, then the level you'd actually tap
+    // next, both right at the top - no scrolling needed to reach them.
+    // Completed levels trail off below, oldest at the very bottom.
+    const nodeLevels = [highest + 1, ...Array.from({ length: highest }, (_, i) => highest - i)];
+    const totalHeight = LEVEL_NODE_TOP_PAD * 2 + (nodeLevels.length - 1) * LEVEL_NODE_SPACING_Y;
+    map.style.height = totalHeight + "px";
+    const points = nodeLevels.map((_, i) => [levelNodeX(i), levelNodeY(i)]);
+
+    map.innerHTML = `<svg class="level-path" viewBox="0 0 100 ${totalHeight}" preserveAspectRatio="none" width="100%" height="${totalHeight}" aria-hidden="true">
+      <polyline points="${points.map((p) => p.join(",")).join(" ")}" fill="none" stroke="var(--panel-line)" stroke-width="1.5" stroke-dasharray="1.5 3.5" stroke-linecap="round"/>
+    </svg>`;
+
+    nodeLevels.forEach((n, i) => {
+      const [x, y] = points[i];
+      if (n > highest) {
+        // The next level to unlock - shown, but not playable yet.
+        const nextCfg = levelConfig(n);
+        const lockedBtn = document.createElement("button");
+        lockedBtn.className = "level-node locked";
+        lockedBtn.style.left = x + "%";
+        lockedBtn.style.top = y + "px";
+        lockedBtn.disabled = true;
+        lockedBtn.title = `Clear Level ${highest} to unlock - reach ${nextCfg.target} pts`;
+        lockedBtn.innerHTML = `<span class="num">\u{1F512}</span>`;
+        map.appendChild(lockedBtn);
+        return;
+      }
+      const cfg = levelConfig(n);
+      const earnedStars = (profile.levelStars || {})[n] || 0;
+      const btn = document.createElement("button");
+      btn.className = "level-node" + (earnedStars > 0 ? " cleared" : "") + (n === highest ? " next" : "");
+      btn.style.left = x + "%";
+      btn.style.top = y + "px";
+      btn.title = `Level ${n} - reach ${cfg.target} pts in ${cfg.moves} moves`;
+      btn.innerHTML = `<span class="num">${n}</span><span class="mini-stars">${starsHTML(earnedStars)}</span>`;
+      btn.addEventListener("click", () => {
+        showOverlay(null);
+        newRound(n);
+      });
+      map.appendChild(btn);
+    });
+    map.scrollTop = 0; // always land at the top (the newest levels), even on reopen
+
+    showOverlay("overlay-levels");
+  }
+
+  function showCustomizeAvatar() {
+    const profile = state.profile;
+    const earned = totalStars(profile);
+    const current = normalizeAvatar(profile.avatar);
+    state.pendingGem = current.color;
+
+    document.getElementById("customize-sub").textContent = `${earned} ★ earned - tap a gem to choose it`;
+
+    function renderPreview() {
+      document.getElementById("avatar-preview").innerHTML = avatarHTML({ color: state.pendingGem }, { full: true, stars: earned });
+    }
+
+    const row = document.getElementById("cosmetic-slots");
+    function renderRow() {
+      row.innerHTML = "";
+      for (const g of GEM_PALETTE) {
+        const unlocked = earned >= g.unlockStars;
+        const btn = document.createElement("button");
+        btn.className = "cosmetic-item" + (unlocked ? "" : " locked") + (state.pendingGem === g.id ? " equipped" : "");
+        btn.title = g.label;
+        btn.innerHTML = unlocked
+          ? avatarHTML({ color: g.id }, { stars: 0 })
+          : `\u{1F512}<span class="req">${g.unlockStars}★</span>`;
+        btn.disabled = !unlocked;
+        if (unlocked) {
+          btn.addEventListener("click", () => {
+            state.pendingGem = g.id;
+            renderRow();
+            renderPreview();
+          });
+        }
+        row.appendChild(btn);
+      }
+    }
+    renderRow();
+    renderPreview();
+    showOverlay("overlay-customize");
+  }
+
+  function showLeaderboard() {
+    const profiles = [...state.profiles].sort(
+      (a, b) => totalStars(b) - totalStars(a) || (b.highestLevelUnlocked || 1) - (a.highestLevelUnlocked || 1)
+    );
+
+    const list = document.getElementById("leaderboard-list");
+    list.innerHTML = "";
+    if (!profiles.length) {
+      list.innerHTML = `<li class="empty">No players yet!</li>`;
+    }
+    profiles.forEach((p, i) => {
+      const li = document.createElement("li");
+      if (state.profile && p.id === state.profile.id) li.classList.add("mine");
+      const highest = p.highestLevelUnlocked || 1;
+      li.innerHTML = `<span class="rank">${i + 1}</span>${avatarHTML(p.avatar, { stars: totalStars(p) })}<div class="name">${escapeHTML(p.name)}<div class="level-tag">Level ${highest}</div></div><span class="pts">${totalStars(p)} \u2605</span>`;
+      list.appendChild(li);
+    });
+    showOverlay("overlay-leaderboard");
+  }
+
+  document.getElementById("btn-new-player").addEventListener("click", () => {
+    document.getElementById("name-input").value = "";
+    showOverlay("overlay-name");
+    document.getElementById("name-input").focus();
+  });
+
+  document.getElementById("name-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btn-name-next").click();
+  });
+
+  document.getElementById("btn-name-next").addEventListener("click", () => {
+    const name = document.getElementById("name-input").value.trim().slice(0, 14);
+    state.pendingName = name || "Player";
+    state.pendingGem = GEM_PALETTE.find((g) => g.unlockStars === 0).id;
+    renderAvatarGrid();
+    document.getElementById("avatar-sub").textContent = `Choose one, ${state.pendingName}!`;
+    showOverlay("overlay-avatar");
+  });
+
+  function renderAvatarGrid() {
+    const grid = document.getElementById("avatar-grid");
+    grid.innerHTML = "";
+    GEM_PALETTE.filter((g) => g.unlockStars === 0).forEach((g) => {
+      const btn = document.createElement("button");
+      btn.className = "avatar-pick" + (state.pendingGem === g.id ? " chosen" : "");
+      btn.title = g.label;
+      btn.innerHTML = avatarHTML({ color: g.id }, { stars: 0 });
+      btn.addEventListener("click", () => {
+        state.pendingGem = g.id;
+        renderAvatarGrid();
+      });
+      grid.appendChild(btn);
+    });
+  }
+
+  document.getElementById("btn-avatar-confirm").addEventListener("click", async () => {
+    const profile = {
+      id: makeProfileId(),
+      name: state.pendingName,
+      avatar: { color: state.pendingGem },
+      highestLevelUnlocked: 1,
+      levelStars: {},
+    };
+    state.profiles.push(profile);
+    // Set this before saving: a successful publish reloads the page, so
+    // anything after that call may never run - see PUBLISHING above.
+    try { localStorage.setItem(STORE_MY_PROFILE_ID, profile.id); } catch { /* ignore */ }
+    await saveProfiles(state.profiles);
+    choosePlayer(profile);
+  });
+
+  document.getElementById("btn-switch-player").addEventListener("click", () => {
+    renderProfilePicker();
+    showOverlay("overlay-profiles");
+  });
+
+  document.getElementById("btn-show-leaderboard").addEventListener("click", showLeaderboard);
+  document.getElementById("btn-close-leaderboard").addEventListener("click", showLevelSelect);
+
+  document.getElementById("btn-open-customize").addEventListener("click", showCustomizeAvatar);
+  document.getElementById("btn-customize-cancel").addEventListener("click", showLevelSelect);
+  document.getElementById("btn-customize-save").addEventListener("click", async () => {
+    state.profile.avatar = { color: state.pendingGem };
+    showLevelSelect(); // reflect the change immediately, before the save (see PUBLISHING)
+    await saveProfiles(state.profiles);
+  });
+
+  document.getElementById("btn-next-level").addEventListener("click", () => {
+    showOverlay(null);
+    newRound(state.level + 1);
+  });
+  document.getElementById("btn-retry-level").addEventListener("click", () => {
+    showOverlay(null);
+    newRound(state.level);
+  });
+  document.getElementById("btn-to-levels").addEventListener("click", showLevelSelect);
+
+  // ---------------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------------
+  state.profiles = loadInitialProfiles();
+  for (const p of state.profiles) migrateProfile(p);
+
+  function tryAutoResume() {
+    let myId = null;
+    try { myId = localStorage.getItem(STORE_MY_PROFILE_ID); } catch { /* ignore */ }
+    if (!myId) return false;
+    const found = state.profiles.find((p) => p.id === myId);
+    if (!found) return false;
+    choosePlayer(found); // e.g. resuming right after a level-complete publish reloaded the page
+    return true;
+  }
+
+  if (!tryAutoResume()) {
+    renderProfilePicker();
+    showOverlay("overlay-profiles");
+  }
+})();
+</script>
