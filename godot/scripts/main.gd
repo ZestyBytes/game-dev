@@ -110,12 +110,23 @@ func _make_gem(pos: Vector2i, value: int) -> Panel:
 	highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	gem.add_child(highlight)
 	gem.mouse_filter = Control.MOUSE_FILTER_STOP
-	gem.gui_input.connect(_on_gem_input.bind(pos))
+	# Bound to the gem node itself, not its position: gems get reassigned to
+	# new positions on every swap/fall, so a position bound at creation time
+	# would go stale the moment this gem moves (clicks would then report
+	# wherever it originally spawned, not where it visually sits now).
+	gem.gui_input.connect(_on_gem_input.bind(gem))
 	board_rect.add_child(gem)
-	gems[pos] = gem
+	_set_gem(pos, gem)
 	_place_gem(gem, pos) # sizes it (and its highlight) before styling needs cell_size
 	_style_gem(gem, value)
 	return gem
+
+## The single place gems[] is written, so a gem's current logical position
+## is always readable back off the node itself via metadata - see the note
+## in _make_gem.
+func _set_gem(pos: Vector2i, gem: Panel) -> void:
+	gems[pos] = gem
+	gem.set_meta("grid_pos", pos)
 
 ## A gem is a Panel (rounded rect, real corners) with a small lighter
 ## "Highlight" panel in its top-left corner for a glossy look - a cheap
@@ -177,11 +188,11 @@ func _place_gem(gem: Panel, pos: Vector2i) -> void:
 	highlight.position = Vector2(cell_size * 0.12, cell_size * 0.1)
 	highlight.size = Vector2(cell_size * 0.38, cell_size * 0.28)
 
-func _on_gem_input(event: InputEvent, pos: Vector2i) -> void:
+func _on_gem_input(event: InputEvent, gem: Panel) -> void:
 	if busy or round_over:
 		return
 	if event is InputEventScreenTouch and event.pressed or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
-		_handle_select(pos)
+		_handle_select(gem.get_meta("grid_pos"))
 
 func _handle_select(pos: Vector2i) -> void:
 	if selected == null:
@@ -226,8 +237,8 @@ func _animate_swap(a: Vector2i, b: Vector2i) -> void:
 	tw.tween_property(ga, "position", _cell_pos(b), SWAP_TIME)
 	tw.tween_property(gb, "position", _cell_pos(a), SWAP_TIME)
 	await tw.finished
-	gems[a] = gb
-	gems[b] = ga
+	_set_gem(a, gb)
+	_set_gem(b, ga)
 
 func _cell_pos(pos: Vector2i) -> Vector2:
 	return Vector2(CELL_GAP + pos.y * (cell_size + CELL_GAP), CELL_GAP + pos.x * (cell_size + CELL_GAP))
@@ -310,7 +321,7 @@ func _animate_fall(moves: Array, spawns: Array) -> void:
 	for move in moves:
 		var gem: Panel = gems[move["from"]]
 		gems.erase(move["from"])
-		gems[move["to"]] = gem
+		_set_gem(move["to"], gem)
 		tw.tween_property(gem, "position", _cell_pos(move["to"]), FALL_TIME)
 	for spawn in spawns:
 		var pos: Vector2i = spawn["to"]
