@@ -100,15 +100,17 @@
     margin-right: auto;
   }
 
-  /* iOS Safari has a bug where `aspect-ratio` on a `display:grid` container
-     with `fr` row tracks doesn't resolve - the grid falls back to an
-     unconstrained auto height instead of a square, stretching the board
-     way past the viewport (see the mobile bug this fixes). Keeping
-     aspect-ratio on this plain block wrapper instead, and letting the grid
-     fill it absolutely, sidesteps that combination entirely. */
+  /* Some iOS Safari versions don't reliably resolve `aspect-ratio` at all
+     (even moved off the grid itself, onto this plain wrapper - see the
+     mobile bug this fixes, and the one before it), so the board stretches
+     way past the viewport instead of staying square. The padding-bottom
+     trick below computes the square from width alone, with no dependency
+     on aspect-ratio support, so it works everywhere. */
   .board-wrap {
     position: relative;
-    aspect-ratio: 1 / 1;
+    width: 100%;
+    height: 0;
+    padding-bottom: 100%;
   }
 
   .header {
