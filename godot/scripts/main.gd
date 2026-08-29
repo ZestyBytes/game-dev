@@ -21,8 +21,10 @@ const FALL_TIME := 0.18
 const CLEAR_TIME := 0.12
 
 const BONUS_TIME_MAX := 6.0 # seconds of "fast" window before bonus decays
-const START_MOVES := 20
-const TARGET_SCORE := 1500
+
+var level_number: int = 1
+var start_moves: int = 20
+var target_score: int = 1500
 
 var board: BoardLogic
 var gems := {} # Vector2i -> Panel
@@ -35,7 +37,7 @@ var round_over := false
 var selected: Variant = null # Vector2i or null
 
 var score := 0
-var moves_left := START_MOVES
+var moves_left := 0
 var combo_depth := 0
 var bonus_time := BONUS_TIME_MAX
 
@@ -47,11 +49,19 @@ var bonus_time := BONUS_TIME_MAX
 @onready var overlay: Control = %RoundOverlay
 @onready var overlay_label: Label = %RoundOverlayLabel
 @onready var restart_button: Button = %RestartButton
+@onready var next_level_button: Button = %NextLevelButton
+@onready var level_select_button: Button = %LevelSelectButton
 @onready var sound: Sound = %Sound
 
 func _ready() -> void:
-	target_label.text = "Target: %d" % TARGET_SCORE
+	level_number = Save.current_level
+	var cfg: Dictionary = Levels.config(level_number)
+	start_moves = cfg["moves"]
+	target_score = cfg["target"]
+	target_label.text = "Level %d — Target: %d" % [level_number, target_score]
 	restart_button.pressed.connect(_start_round)
+	next_level_button.pressed.connect(_play_next_level)
+	level_select_button.pressed.connect(_go_to_level_select)
 	board_wrap.resized.connect(_layout_board)
 	_start_round()
 
@@ -59,7 +69,7 @@ func _start_round() -> void:
 	overlay.hide()
 	round_over = false
 	score = 0
-	moves_left = START_MOVES
+	moves_left = start_moves
 	combo_depth = 0
 	bonus_time = BONUS_TIME_MAX
 	score_label.text = "Score: 0"
@@ -376,16 +386,32 @@ func _animate_fall(moves: Array, spawns: Array) -> void:
 	await tw.finished
 
 func _check_round_end() -> void:
-	if score >= TARGET_SCORE:
+	if score >= target_score:
 		_end_round(true)
 	elif moves_left <= 0:
 		_end_round(false)
 
 func _end_round(won: bool) -> void:
 	round_over = true
-	overlay_label.text = ("You win! Score: %d" % score) if won else ("Out of moves. Score: %d" % score)
+	if won:
+		var stars: int = Levels.stars_for_result(moves_left, start_moves)
+		Save.record_level_result(level_number, stars, score)
+		var star_str := "★".repeat(stars) + "☆".repeat(3 - stars)
+		overlay_label.text = "Level %d complete!  %s\nScore: %d" % [level_number, star_str, score]
+		next_level_button.show()
+	else:
+		Save.record_level_result(level_number, 0, score) # still tracks a best score even on a loss
+		overlay_label.text = "Out of moves.\nScore: %d  (target %d)" % [score, target_score]
+		next_level_button.hide()
 	sound.play_round_end(won)
 	overlay.show()
+
+func _play_next_level() -> void:
+	Save.current_level = level_number + 1
+	get_tree().reload_current_scene()
+
+func _go_to_level_select() -> void:
+	get_tree().change_scene_to_file("res://scenes/LevelSelect.tscn")
 
 func _check_stuck_board() -> void:
 	if not board.has_any_move():

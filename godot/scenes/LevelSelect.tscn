@@ -1,0 +1,59 @@
+[gd_scene load_steps=2 format=3 uid="uid://bqjw6f0kx3n8y"]
+
+[ext_resource type="Script" path="res://scripts/level_select.gd" id="1_select"]
+
+[node name="LevelSelect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_select")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.11, 0.09, 0.16, 1)
+
+[node name="Layout" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+
+[node name="HUD" type="HBoxContainer" parent="Layout"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Layout/HUD"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Gumdrop Cascade"
+theme_override_font_sizes/font_size = 26
+
+[node name="TotalStarsLabel" type="Label" parent="Layout/HUD" unique_name_in_owner="true"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "★ 0"
+theme_override_font_sizes/font_size = 20
+
+[node name="Scroll" type="ScrollContainer" parent="Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LevelList" type="VBoxContainer" parent="Layout/Scroll" unique_name_in_owner="true"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
