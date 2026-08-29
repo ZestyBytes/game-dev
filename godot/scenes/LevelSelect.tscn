@@ -48,6 +48,22 @@ layout_mode = 2
 text = "★ 0"
 theme_override_font_sizes/font_size = 20
 
+[node name="PlayerRow" type="HBoxContainer" parent="Layout"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PlayerLabel" type="Label" parent="Layout/PlayerRow" unique_name_in_owner="true"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Player"
+theme_override_font_sizes/font_size = 16
+
+[node name="SwitchPlayerButton" type="Button" parent="Layout/PlayerRow" unique_name_in_owner="true"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Switch player"
+
 [node name="Scroll" type="ScrollContainer" parent="Layout"]
 layout_mode = 2
 size_flags_vertical = 3

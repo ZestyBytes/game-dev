@@ -54,6 +54,9 @@ var bonus_time := BONUS_TIME_MAX
 @onready var sound: Sound = %Sound
 
 func _ready() -> void:
+	if Save.active_profile().is_empty():
+		get_tree().change_scene_to_file("res://scenes/ProfileSelect.tscn")
+		return
 	level_number = Save.current_level
 	var cfg: Dictionary = Levels.config(level_number)
 	start_moves = cfg["moves"]
