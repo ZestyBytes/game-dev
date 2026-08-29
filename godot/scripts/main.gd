@@ -255,6 +255,9 @@ func _resolve_matches() -> void:
 		var gained := _award_score(cleared.size())
 		sound.play_match(combo_depth)
 		_spawn_score_popup(cleared, gained)
+		_show_combo_message(combo_depth)
+		if combo_depth >= 3:
+			_shake_board()
 		await _animate_clear(cleared, bombs)
 		var fall := board.collapse_and_refill()
 		await _animate_fall(fall["moves"], fall["spawns"])
@@ -295,6 +298,45 @@ func _spawn_score_popup(cells: Array, gained: int) -> void:
 	tw.tween_property(label, "position:y", label.position.y - cell_size * 0.8, 0.6)
 	tw.tween_property(label, "modulate:a", 0.0, 0.6).set_delay(0.15)
 	tw.chain().tween_callback(label.queue_free)
+
+const COMBO_MESSAGES := {2: "Nice!", 3: "Great!", 4: "Awesome!", 5: "Incredible!"}
+
+## A big centered callout for a chain reaction (2+ matches from one move),
+## mirroring the web version's combo messages. Depth 1 (a plain single
+## match) shows nothing - only actual chains call this out.
+func _show_combo_message(depth: int) -> void:
+	if depth < 2:
+		return
+	var text: String = COMBO_MESSAGES.get(min(depth, 5), "Combo x%d!" % depth)
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", max(20, int(cell_size * 0.6)))
+	label.add_theme_color_override("font_color", Color("ffe066"))
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	label.add_theme_constant_override("outline_size", 5)
+	label.set_anchors_preset(Control.PRESET_CENTER)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.pivot_offset = label.size / 2.0
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.scale = Vector2(0.4, 0.4)
+	board_rect.add_child(label)
+	label.position = board_rect.size / 2.0 - label.size / 2.0
+
+	var tw := create_tween()
+	tw.tween_property(label, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.35)
+	tw.tween_property(label, "modulate:a", 0.0, 0.25)
+	tw.tween_callback(label.queue_free)
+
+## A quick side-to-side rattle on the whole board for a satisfying chain,
+## mirroring the web version's shakeBoard().
+func _shake_board() -> void:
+	var base_pos := board_rect.position
+	var tw := create_tween()
+	for i in range(4):
+		var offset := Vector2(6 if i % 2 == 0 else -6, 0)
+		tw.tween_property(board_rect, "position", base_pos + offset, 0.04)
+	tw.tween_property(board_rect, "position", base_pos, 0.04)
 
 func _animate_clear(cells: Array, bombs: Dictionary) -> void:
 	var tw := create_tween()
