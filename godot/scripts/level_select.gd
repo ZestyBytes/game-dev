@@ -7,13 +7,21 @@ const LEVEL_COUNT := 20 # how many level buttons to list; more unlock as you cle
 
 @onready var list: VBoxContainer = %LevelList
 @onready var total_stars_label: Label = %TotalStarsLabel
+@onready var player_label: Label = %PlayerLabel
+@onready var switch_player_button: Button = %SwitchPlayerButton
 
 func _ready() -> void:
+	if Save.active_profile().is_empty():
+		# Reached directly (e.g. F5 in the editor) with no profile chosen yet.
+		get_tree().change_scene_to_file("res://scenes/ProfileSelect.tscn")
+		return
+	switch_player_button.pressed.connect(_switch_player)
 	_rebuild()
 
 func _rebuild() -> void:
 	for child in list.get_children():
 		child.queue_free()
+	player_label.text = Save.active_profile_name()
 	total_stars_label.text = "★ %d" % Save.total_stars()
 
 	var unlocked := Save.highest_unlocked()
@@ -39,8 +47,8 @@ func _make_level_row(n: int, unlocked: bool) -> Control:
 	panel.add_child(row)
 
 	var label := Label.new()
-	var stars: int = Save.level_stars.get(n, 0)
-	var best: int = Save.best_scores.get(n, 0)
+	var stars: int = Save.level_stars().get(n, 0)
+	var best: int = Save.best_scores().get(n, 0)
 	if unlocked:
 		var star_str := "★".repeat(stars) + "☆".repeat(3 - stars)
 		var best_str := (" · best %d" % best) if best > 0 else ""
@@ -62,3 +70,6 @@ func _make_level_row(n: int, unlocked: bool) -> Control:
 func _play_level(n: int) -> void:
 	Save.current_level = n
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
+
+func _switch_player() -> void:
+	get_tree().change_scene_to_file("res://scenes/ProfileSelect.tscn")
