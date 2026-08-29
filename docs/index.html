@@ -93,11 +93,22 @@
 
   /* The actual game content stays a comfortable width and centered even
      though .cabinet itself now always spans the full window. */
-  .header, .board, .footer {
+  .header, .board-wrap, .footer {
     width: 100%;
     max-width: 560px;
     margin-left: auto;
     margin-right: auto;
+  }
+
+  /* iOS Safari has a bug where `aspect-ratio` on a `display:grid` container
+     with `fr` row tracks doesn't resolve - the grid falls back to an
+     unconstrained auto height instead of a square, stretching the board
+     way past the viewport (see the mobile bug this fixes). Keeping
+     aspect-ratio on this plain block wrapper instead, and letting the grid
+     fill it absolutely, sidesteps that combination entirely. */
+  .board-wrap {
+    position: relative;
+    aspect-ratio: 1 / 1;
   }
 
   .header {
@@ -208,17 +219,15 @@
   @keyframes gem-aura-spin { to { transform: rotate(360deg); } }
 
   .board {
-    position: relative;
+    position: absolute;
+    inset: 0;
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    grid-template-rows: repeat(8, 1fr); /* explicit, not auto - see the mobile
-      board-stretching bug this fixes: implicit auto rows can absorb any
-      stray extra height a WebKit dvh quirk hands the ancestor chain */
+    grid-template-rows: repeat(8, 1fr);
     gap: clamp(3px, 0.8vw, 6px);
     background: var(--panel-line);
     border-radius: 18px;
     padding: clamp(6px, 1.4vw, 10px);
-    aspect-ratio: 1 / 1;
     touch-action: none;
     -webkit-user-select: none;
     user-select: none;
@@ -762,7 +771,9 @@
     </button>
   </div>
 
-  <div class="board" id="board" role="grid" aria-label="Candy board"></div>
+  <div class="board-wrap">
+    <div class="board" id="board" role="grid" aria-label="Candy board"></div>
+  </div>
 
   <div class="footer">
     <div class="message" id="message" hidden>Good luck!</div>
