@@ -80,16 +80,71 @@ func find_matches() -> Array:
 func has_matches() -> bool:
 	return find_matches().size() > 0
 
-## Clears matched cells (sets to -1) and returns the flat set of unique
-## cleared positions, for scoring.
-func clear_matches(runs: Array) -> Array:
+## A cleared run of 4+ candies of the same color promotes its middle cell
+## into a "bomb" of that color instead of clearing it. Bombs are encoded as
+## 100 + color so they keep falling/refilling like any other grid value.
+## When a bomb is later cleared (matched directly, or caught in another
+## bomb's blast), it detonates its whole row + column instead of just
+## itself - the "T-shape bombs" from the web version's QoL pass.
+const BOMB_OFFSET := 100
+
+static func is_bomb(value: int) -> bool:
+	return value >= BOMB_OFFSET
+
+static func bomb_color(value: int) -> int:
+	return value - BOMB_OFFSET
+
+## Clears matched cells, promoting long runs to bombs and detonating any
+## bombs caught in the blast. Returns {cleared: Array[Vector2i], bombs:
+## Dictionary[Vector2i, int color]} - `cleared` cells are set to -1,
+## `bombs` cells are left in the grid as new bomb candies.
+func clear_matches(runs: Array) -> Dictionary:
 	var seen := {}
+	var bombs := {} # anchor pos -> color, promoted this pass (kept, not cleared)
 	for run in runs:
-		for cell in run["cells"]:
+		var cells: Array = run["cells"]
+		for cell in cells:
 			seen[cell] = true
+		if cells.size() >= 4:
+			var anchor: Vector2i = cells[cells.size() / 2]
+			bombs[anchor] = grid[anchor.x][anchor.y]
+	for pos in bombs.keys():
+		seen.erase(pos)
+
+	# Detonate any bomb caught in the cells actually being cleared, adding
+	# its row+column to the clear set - repeat since that can chain into
+	# further bombs.
+	var exploded := {}
+	var changed := true
+	while changed:
+		changed = false
+		for cell in seen.keys().duplicate():
+			if exploded.has(cell):
+				continue
+			exploded[cell] = true
+			if is_bomb(grid[cell.x][cell.y]):
+				for cc in _cross_cells(cell):
+					if not seen.has(cc) and not bombs.has(cc):
+						seen[cc] = true
+						changed = true
+	for pos in bombs.keys():
+		seen.erase(pos)
+
 	for cell in seen.keys():
 		grid[cell.x][cell.y] = -1
-	return seen.keys()
+	for pos in bombs.keys():
+		grid[pos.x][pos.y] = BOMB_OFFSET + bombs[pos] # bombs[pos] holds the plain 0-5 color
+	return {"cleared": seen.keys(), "bombs": bombs}
+
+func _cross_cells(pos: Vector2i) -> Array:
+	var cells := []
+	for c in range(SIZE):
+		if c != pos.y:
+			cells.append(Vector2i(pos.x, c))
+	for r in range(SIZE):
+		if r != pos.x:
+			cells.append(Vector2i(r, pos.y))
+	return cells
 
 ## Applies gravity (candies fall into empty cells below them) and refills
 ## empty cells at the top with new random candies. Returns an array of

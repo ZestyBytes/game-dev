@@ -16,7 +16,8 @@ func _init() -> void:
 	b.grid[0][2] = 0
 	var runs := b.find_matches()
 	assert(runs.size() >= 1, "should detect the forced run")
-	var cleared := b.clear_matches(runs)
+	var result0 := b.clear_matches(runs)
+	var cleared: Array = result0["cleared"]
 	assert(cleared.size() >= 3)
 	assert(b.grid[0][0] == -1)
 
@@ -25,6 +26,28 @@ func _init() -> void:
 	for r in range(BoardLogic.SIZE):
 		for c in range(BoardLogic.SIZE):
 			assert(b.grid[r][c] != -1, "no empty cells should remain after refill")
+
+	# A run of 4 should promote a bomb instead of clearing everything.
+	var b2 := BoardLogic.new_random()
+	b2.grid[3][0] = 2
+	b2.grid[3][1] = 2
+	b2.grid[3][2] = 2
+	b2.grid[3][3] = 2
+	var runs2 := b2.find_matches()
+	var result2 := b2.clear_matches(runs2)
+	var bombs: Dictionary = result2["bombs"]
+	assert(bombs.size() == 1, "a run of 4 should create exactly one bomb")
+	var bomb_pos: Vector2i = bombs.keys()[0]
+	assert(BoardLogic.is_bomb(b2.grid[bomb_pos.x][bomb_pos.y]), "bomb cell should stay a bomb, not clear")
+	assert(BoardLogic.bomb_color(b2.grid[bomb_pos.x][bomb_pos.y]) == 2)
+
+	# Detonating the bomb should clear its whole row and column.
+	var b3 := BoardLogic.new_random()
+	b3.grid[2][2] = BoardLogic.BOMB_OFFSET + 1
+	var fake_runs: Array = [{"cells": [Vector2i(2, 2), Vector2i(2, 3), Vector2i(2, 4)], "horizontal": true}]
+	var result3 := b3.clear_matches(fake_runs)
+	var cleared3: Array = result3["cleared"]
+	assert(cleared3.size() >= BoardLogic.SIZE * 2 - 2, "detonating a bomb should sweep its row + column")
 
 	# is_adjacent / swap sanity.
 	assert(b.is_adjacent(Vector2i(0, 0), Vector2i(0, 1)))
