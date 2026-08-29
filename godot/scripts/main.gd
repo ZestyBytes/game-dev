@@ -70,7 +70,11 @@ func _start_round() -> void:
 	bomb_marks.clear()
 	if board_rect == null:
 		board_rect = Control.new()
-		board_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		# Top-left preset (all anchors 0) rather than full-rect: we size and
+		# position this manually every layout pass to keep it a centered
+		# square, so stretch-anchors here would just fight that and log a
+		# "non-equal opposite anchors" warning when we set .size directly.
+		board_rect.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		board_wrap.add_child(board_rect)
 	_build_gems()
 	_layout_board()
@@ -115,8 +119,8 @@ func _layout_board() -> void:
 		return
 	var size: float = min(board_wrap.size.x, board_wrap.size.y)
 	cell_size = (size - CELL_GAP * (BoardLogic.SIZE + 1)) / float(BoardLogic.SIZE)
-	board_rect.custom_minimum_size = Vector2(size, size)
 	board_rect.size = Vector2(size, size)
+	board_rect.position = (board_wrap.size - Vector2(size, size)) / 2.0
 	for pos in gems.keys():
 		_place_gem(gems[pos], pos)
 
