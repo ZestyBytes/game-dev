@@ -1520,6 +1520,22 @@
     level: document.getElementById("stat-level"),
   };
 
+  // iOS Safari bug (the real culprit behind the "board is squished into one
+  // row" mobile reports): when .board-wrap's height comes purely from the
+  // height:0 + padding-bottom:100% trick, Safari sometimes resolves the
+  // containing-block height for the absolutely-positioned .board (inset:0)
+  // against the 0 height instead of the padding box. The grid's `1fr` rows
+  // then all collapse to zero height and stack on top of each other, so
+  // only one visual row of pieces shows, vertically centered in the middle
+  // of an otherwise-empty square. Fix: give .board an explicit pixel height
+  // that always matches its own width, so the grid never depends on that
+  // ambiguous containing-block resolution at all.
+  function syncBoardSquare() {
+    el.board.style.height = el.board.offsetWidth + "px";
+  }
+  new ResizeObserver(syncBoardSquare).observe(el.board);
+  syncBoardSquare();
+
   function setMessage(text) { el.message.textContent = text; }
   function starsHTML(count, size) {
     const cls = size || "";
