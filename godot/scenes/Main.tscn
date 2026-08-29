@@ -105,7 +105,17 @@ text = "You win!"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 30
 
+[node name="NextLevelButton" type="Button" parent="RoundOverlay/Center" unique_name_in_owner="true"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Next level"
+
 [node name="RestartButton" type="Button" parent="RoundOverlay/Center" unique_name_in_owner="true"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Play again"
+text = "Retry level"
+
+[node name="LevelSelectButton" type="Button" parent="RoundOverlay/Center" unique_name_in_owner="true"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Level select"
